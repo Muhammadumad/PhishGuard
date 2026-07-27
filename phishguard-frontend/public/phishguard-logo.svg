@@ -1,0 +1,30 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="shieldGradient" x1="48" y1="28" x2="208" y2="228" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#26C6FF"/>
+      <stop offset="1" stop-color="#0E5D8D"/>
+    </linearGradient>
+    <linearGradient id="innerGradient" x1="64" y1="52" x2="192" y2="212" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E8F7FF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#94D8FF" stop-opacity="0.6"/>
+    </linearGradient>
+    <filter id="glow" x="0" y="0" width="256" height="256" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <circle cx="128" cy="128" r="110" fill="#03111D"/>
+  <circle cx="128" cy="128" r="102" stroke="#26C6FF" stroke-opacity="0.2" stroke-width="2"/>
+
+  <path d="M128 28L208 62V116C208 168 173 214 128 232C83 214 48 168 48 116V62L128 28Z" fill="url(#shieldGradient)" filter="url(#glow)"/>
+  <path d="M128 50L190 76V116C190 157 163 193 128 210C93 193 66 157 66 116V76L128 50Z" fill="#071729" stroke="#79DAFF" stroke-opacity="0.5" stroke-width="2"/>
+
+  <path d="M128 78L166 94V118C166 146 149 170 128 182C107 170 90 146 90 118V94L128 78Z" fill="url(#innerGradient)" fill-opacity="0.18"/>
+
+  <path d="M113 150V98H135C149 98 157 106 157 118C157 132 149 140 135 140H123V150H113ZM123 131H134C141 131 146 126 146 119C146 112 141 108 134 108H123V131Z" fill="#DDF5FF"/>
+  <path d="M99 95L99 157" stroke="#88DFFF" stroke-width="2" stroke-opacity="0.6"/>
+</svg>

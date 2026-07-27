@@ -1,0 +1,8 @@
+{
+  "suspicious_threshold": 25,
+  "phishing_threshold": 55,
+  "samples": 174,
+  "macro_f1": 1.0,
+  "accuracy": 1.0,
+  "tuned_at": "2026-04-03T17:14:45.142760+00:00"
+}
