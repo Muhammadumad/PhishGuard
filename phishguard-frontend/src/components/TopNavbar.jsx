@@ -10,10 +10,12 @@ import {
   Gear,
   Grid,
   LightningCharge,
+  List,
   MoonStars,
   PersonPlus,
   Search,
   Sliders,
+  X,
 } from "react-bootstrap-icons";
 import useAuthStore from "../store/authStore";
 import useThemeStore from "../store/ThemeStore";
@@ -37,6 +39,7 @@ export default function TopNavbar() {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   
   const menuRef = useRef(null);
 
@@ -52,6 +55,7 @@ export default function TopNavbar() {
     setSettingsOpen(false);
     setUserMenuOpen(false);
     setConfirmLogout(false);
+    setMobileNavOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -78,19 +82,31 @@ export default function TopNavbar() {
   return (
     <header className="pg-glass-topbar">
       <div className="pg-topbar-inner" ref={menuRef}>
-        {/* ── Left: Brand & Logo ────────────────────────────────────────── */}
-        <Link to="/dashboard" className="pg-topbar-brand">
-          <div className="pg-logo-icon">
-            <img src="/phishguard-logo.svg" alt="PhishGuard logo" className="pg-logo-img" />
-          </div>
-          <div className="pg-brand-text">
-            <span className="pg-brand-name">PhishGuard</span>
-            <span className="pg-brand-tag">Console</span>
-          </div>
-        </Link>
+        {/* ── Left: Brand & Mobile Hamburger Toggle ─────────────────────── */}
+        <div className="pg-topbar-left-group">
+          <button
+            type="button"
+            className="pg-mobile-hamburger-btn"
+            onClick={() => setMobileNavOpen((prev) => !prev)}
+            aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileNavOpen}
+          >
+            {mobileNavOpen ? <X size={24} /> : <List size={22} />}
+          </button>
 
-        {/* ── Center: Horizontal Page Links ─────────────────────────────── */}
-        <nav className="pg-topbar-nav" aria-label="Main Navigation">
+          <Link to="/dashboard" className="pg-topbar-brand">
+            <div className="pg-logo-icon">
+              <img src="/phishguard-logo.svg" alt="PhishGuard logo" className="pg-logo-img" />
+            </div>
+            <div className="pg-brand-text">
+              <span className="pg-brand-name">PhishGuard</span>
+              <span className="pg-brand-tag">Console</span>
+            </div>
+          </Link>
+        </div>
+
+        {/* ── Center: Desktop Horizontal Page Links ─────────────────────── */}
+        <nav className="pg-topbar-nav pg-desktop-nav" aria-label="Main Navigation">
           {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
             const isActive = pathname === path;
             return (
@@ -230,7 +246,66 @@ export default function TopNavbar() {
           </div>
         </div>
       </div>
+
+      {/* ── Mobile Off-Canvas Drawer Navigation ─────────────────────────── */}
+      {mobileNavOpen && (
+        <div className="pg-mobile-nav-drawer">
+          <nav className="pg-mobile-nav-list" aria-label="Mobile Navigation">
+            {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+              const isActive = pathname === path;
+              return (
+                <Link
+                  key={path}
+                  to={path}
+                  className={`pg-mobile-nav-link${isActive ? " active" : ""}`}
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  <Icon size={18} />
+                  <span>{label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="pg-mobile-drawer-footer">
+            {isGuest && (
+              <div className="pg-mobile-guest-info">
+                <div className="pg-mobile-guest-badge">
+                  <LightningCharge size={14} /> Guest Mode Active
+                </div>
+                <p className="pg-mobile-guest-text">
+                  Session data wipes automatically on tab close.
+                </p>
+                <Link
+                  to="/register"
+                  className="pg-mobile-drawer-btn pg-mobile-btn-primary"
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  <PersonPlus size={16} /> Create Free Account
+                </Link>
+              </div>
+            )}
+
+            <div className="pg-mobile-drawer-actions">
+              <button type="button" onClick={toggle} className="pg-mobile-drawer-btn">
+                {resolvedTheme === "dark" ? <BrightnessHigh size={16} /> : <MoonStars size={16} />}
+                <span>Theme: {resolvedTheme === "dark" ? "Dark" : "Light"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="pg-mobile-drawer-btn pg-text-danger"
+              >
+                <BoxArrowRight size={16} />
+                <span>{isGuest ? "Exit Guest Mode" : "Sign Out"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
+
 
