@@ -1,7 +1,6 @@
 // src/App.jsx
 import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
 import TopNavbar from "./components/TopNavbar";
 import AuthGuard from "./components/AuthGuard";
 
@@ -53,7 +52,7 @@ function Layout() {
     );
   }
 
-  // Auth pages: full screen, no sidebar, perfectly centered
+  // Auth pages: full screen, perfectly centered
   if (isAuth) {
     return (
       <Suspense fallback={<RouteLoader />}>
@@ -66,10 +65,9 @@ function Layout() {
     );
   }
 
-  // App pages: fixed left sidebar + content
+  // App pages: Top Glassmorphism Navbar + Main content
   return (
-    <>
-      <Sidebar />
+    <div className="pg-app-container">
       <TopNavbar />
       <Suspense fallback={<RouteLoader />}>
         <Routes>
@@ -116,10 +114,11 @@ function Layout() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Suspense>
-    </>
+    </div>
   );
 }
 
 export default function App() {
   return <Layout />;
 }
+
