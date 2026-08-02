@@ -1267,13 +1267,17 @@ body.pg-sidebar-resizing * {
   cursor: col-resize !important;
 }
 
-/* ── Main content — pushed right by sidebar width ────────────────────────── */
+/* ── Main content — centered full-width layout (no sidebar) ─────────────── */
 .pg-main {
-  margin-left: var(--sidebar-w);
+  margin-left: 0;
   flex: 1;
-  min-height: 100vh;
-  padding: 98px var(--layout-gutter) 32px;
-  max-width: 1100px;
+  min-height: calc(100vh - 64px);
+  padding: 32px var(--layout-gutter);
+  max-width: 1200px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
   position: relative;
 }
 
@@ -2964,7 +2968,8 @@ body.pg-sidebar-resizing * {
   }
   .pg-main {
     margin-left: 0;
-    padding: 88px 14px 14px;
+    padding: 20px 14px 24px;
+    max-width: 100%;
   }
 
   .pg-topbar {
@@ -4097,6 +4102,12 @@ body.pg-sidebar-resizing * {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
+  align-items: center;
+}
+
+/* Ensure Suspense wrappers & page content flex to full width under the centered container */
+.pg-app-container > * {
   width: 100%;
 }
 
