@@ -48,8 +48,9 @@ function clearAuth() {
 // ── AuthGuard component ───────────────────────────────────────────────────────
 export default function AuthGuard({ children }) {
   const token = localStorage.getItem("pg_access");
+  const isGuest = sessionStorage.getItem("pg_is_guest") === "true";
 
-  if (!isTokenValid(token)) {
+  if (!isGuest && !isTokenValid(token)) {
     // Remove stale/expired tokens before redirecting so login starts clean
     clearAuth();
     return <Navigate to="/login" replace />;

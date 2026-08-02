@@ -273,12 +273,13 @@ def _scan_single_url(request, raw_url, use_live_signals=True):
             except Exception:
                 pass
 
+    user = request.user if (hasattr(request, "user") and request.user and request.user.is_authenticated) else None
     verdict_to_status = {"safe": "safe", "suspicious": "suspicious", "phishing": "phishing"}
     url_obj = URL.objects.create(
         url=raw_url,
         normalized_url=url_clean,
         normalized_hash=normalized_hash,
-        submitted_by=request.user,
+        submitted_by=user,
         status=verdict_to_status.get(features["verdict"], "pending"),
     )
 
@@ -324,6 +325,7 @@ def _scan_urls_batch(request, urls, use_live_signals=True):
     created = 0
     duplicate_count = 0
     failed = 0
+    user = request.user if (hasattr(request, "user") and request.user and request.user.is_authenticated) else None
 
     for index, raw_url in enumerate(urls):
         raw_url_str = "" if raw_url is None else str(raw_url)
@@ -360,7 +362,7 @@ def _scan_urls_batch(request, urls, use_live_signals=True):
                     url=raw_url_str,
                     normalized_url=url_clean,
                     normalized_hash=normalized_hash,
-                    submitted_by=request.user,
+                    submitted_by=user,
                     status={"safe":"safe","suspicious":"suspicious","phishing":"phishing"}.get(cached_scan.verdict, "pending"),
                 )
 
@@ -410,7 +412,7 @@ def _scan_urls_batch(request, urls, use_live_signals=True):
                 url=raw_url_str,
                 normalized_url=url_clean,
                 normalized_hash=normalized_hash,
-                submitted_by=request.user,
+                submitted_by=user,
                 status="queued",
             )
             try:
@@ -446,7 +448,7 @@ def _scan_urls_batch(request, urls, use_live_signals=True):
 
 # ── Scan ──────────────────────────────────────────────────────────────────────
 class ScanView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         try:
@@ -457,10 +459,12 @@ class ScanView(APIView):
             if error:
                 return Response({"error": error}, status=400)
 
+            user = request.user if (hasattr(request, "user") and request.user and request.user.is_authenticated) else None
+
             # create queued URL row
             url_obj = URL.objects.create(
                 url=raw_url,
-                submitted_by=request.user,
+                submitted_by=user,
                 status="queued",
             )
 
@@ -484,7 +488,7 @@ class ScanView(APIView):
 
 
 class BulkScanView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         try:
@@ -509,7 +513,7 @@ class BulkScanView(APIView):
 
 
 class BulkCSVScanView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         try:

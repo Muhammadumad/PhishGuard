@@ -32,7 +32,7 @@ const PAGE_CONTEXT = {
 export default function TopNavbar() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuthStore();
+  const { logout, isGuest } = useAuthStore();
   const { theme, contrast, systemTheme, toggle, toggleContrast } =
     useThemeStore();
   const { mode, toggleMode } = usePerformanceStore();
@@ -117,7 +117,13 @@ export default function TopNavbar() {
         style={{ color: confirmLogout ? "var(--red)" : "var(--text-2)" }}
       >
         <BoxArrowRight size={13} />{" "}
-        {confirmLogout ? "Click again to sign out" : "Sign Out"}
+        {confirmLogout
+          ? isGuest
+            ? "Click again to exit guest mode"
+            : "Click again to sign out"
+          : isGuest
+            ? "Exit Guest Mode"
+            : "Sign Out"}
       </button>
     </>
   );
@@ -133,8 +139,31 @@ export default function TopNavbar() {
         >
           <List size={16} />
         </button>
-        <h1 className="pg-topbar-title">{pageTitle}</h1>
-        <p className="pg-topbar-sub">{pageContext}</p>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <h1 className="pg-topbar-title">{pageTitle}</h1>
+            {isGuest && (
+              <span
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "#f59e0b",
+                  background: "rgba(245, 158, 11, 0.15)",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  padding: "2px 8px",
+                  borderRadius: "12px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                ⚡ GUEST SESSION (Temporary History)
+              </span>
+            )}
+          </div>
+          <p className="pg-topbar-sub">{pageContext}</p>
+        </div>
       </div>
 
       <div className="pg-topbar-mobile-settings">
