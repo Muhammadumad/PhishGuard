@@ -130,9 +130,28 @@ html.theme-switching *::after {
   transition-duration: var(--theme-switch-ms);
   transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html,
 body {
   height: 100%;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  touch-action: manipulation;
+}
+
+#root,
+.app-layout,
+.pg-app-container,
+.pg-main,
+.pg-landing-page,
+.pg-auth-page {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 a,
@@ -141,8 +160,24 @@ input,
 select,
 textarea,
 [role="button"],
-.pg-nav-link {
+.pg-nav-link,
+.pg-btn,
+.pg-btn-primary,
+.pg-btn-ghost,
+.pg-page-btn,
+.pg-filter-btn,
+.pg-icon-btn,
+.pg-auth-submit,
+.pg-field-toggle,
+.pg-select-control,
+.pg-topbar-link,
+.pg-account-badge-btn,
+.pg-guest-badge-btn,
+.pg-settings-trigger-btn,
+.pg-mobile-hamburger-btn {
   -webkit-tap-highlight-color: transparent;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 
 a:focus-visible,
@@ -611,7 +646,7 @@ body.pg-perf-rich .pg-page-analytics::after {
 
 .pg-hero-rules {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0;
   border-top: 1px solid var(--border);
 }
@@ -719,7 +754,7 @@ body.pg-perf-rich .pg-page-analytics::after {
 
 .pg-feed-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
   padding: 12px 0 6px;
   border-top: 1px solid var(--border);
@@ -903,7 +938,7 @@ body.pg-perf-rich .pg-page-analytics::after {
 
 .pg-stats-band {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   border: 1px solid var(--border);
   border-radius: 18px;
   background: rgba(11, 12, 14, 0.96);
@@ -974,7 +1009,7 @@ body.pg-perf-rich .pg-page-analytics::after {
 
 .pg-comparison-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 12px;
 }
 
@@ -1088,7 +1123,7 @@ body.pg-perf-rich .pg-page-analytics::after {
 
 .pg-visibility-band {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 10px;
 }
 
@@ -2008,6 +2043,15 @@ body.pg-sidebar-resizing * {
   font-weight: 700;
 }
 
+.pg-table-responsive,
+.table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
 /* ── Table ───────────────────────────────────────────────────────────────── */
 .pg-table {
   width: 100%;
@@ -2105,7 +2149,8 @@ body.pg-sidebar-resizing * {
 
 .pg-field-input {
   width: 100%;
-  padding: 13px 16px;
+  min-height: 44px;
+  padding: 12px 16px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 12px;
@@ -2129,7 +2174,7 @@ body.pg-sidebar-resizing * {
 
 .pg-field-toggle {
   position: absolute;
-  right: 14px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
@@ -2139,6 +2184,12 @@ body.pg-sidebar-resizing * {
   font-size: 12px;
   font-family: var(--mono);
   font-weight: 600;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
 }
 
 .pg-alert {
@@ -3019,7 +3070,7 @@ body.pg-sidebar-resizing * {
   .pg-btn-ghost,
   .pg-page-btn,
   .pg-filter-btn {
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .pg-url-hover-card {
@@ -4114,14 +4165,16 @@ body.pg-sidebar-resizing * {
 .pg-glass-topbar {
   position: sticky;
   top: 0;
-  z-index: 200;
+  z-index: 400;
   width: 100%;
-  background: rgba(11, 15, 25, 0.78);
+  background: rgba(11, 15, 25, 0.82);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   transition: background 0.3s ease, border-color 0.3s ease;
+  /* Popovers inside use position:absolute — do NOT clip them */
+  overflow: visible;
 }
 
 [data-theme="light"] .pg-glass-topbar {
@@ -4482,14 +4535,13 @@ body.pg-sidebar-resizing * {
   background: rgba(239, 68, 68, 0.12) !important;
 }
 
-/* ── Mobile Responsive & Touch-Target Enhancements (Senior Frontend) ─── */
-.pg-topbar-left-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE HAMBURGER BUTTON
+   Hidden on desktop; revealed via media query at ≤ 767px.
+   Always lives in .pg-topbar-right so the brand stays on the left.
+══════════════════════════════════════════════════════════════════════ */
 .pg-mobile-hamburger-btn {
+  /* Hidden by default on desktop */
   display: none;
   width: 44px;
   height: 44px;
@@ -4502,89 +4554,190 @@ body.pg-sidebar-resizing * {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  flex-shrink: 0;
 }
 
 .pg-mobile-hamburger-btn:hover {
   background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
-/* Mobile Navigation Drawer */
+.pg-mobile-hamburger-btn.is-open {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #818cf8;
+}
+
+[data-theme="light"] .pg-mobile-hamburger-btn {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .pg-mobile-hamburger-btn.is-open {
+  background: rgba(79, 70, 229, 0.1);
+  border-color: rgba(79, 70, 229, 0.35);
+  color: #4f46e5;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE DRAWER BACKDROP
+   Full-screen dark overlay rendered below the drawer.
+   Clicking it closes the drawer.
+══════════════════════════════════════════════════════════════════════ */
+.pg-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 390;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: pgFadeIn 0.2s ease forwards;
+}
+
+@keyframes pgFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE NAVIGATION DRAWER
+   Sits directly below the sticky topbar (position: fixed, top = topbar height).
+   Uses CSS transforms for open/close animation — works whether the element
+   is always in the DOM or conditionally rendered.
+══════════════════════════════════════════════════════════════════════ */
 .pg-mobile-nav-drawer {
-  position: absolute;
-  top: 100%;
+  /* Fixed so it's anchored to the viewport — not clipped by any parent */
+  position: fixed;
+  top: 58px;          /* matches mobile topbar height */
   left: 0;
   right: 0;
-  background: linear-gradient(180deg, rgba(11, 15, 25, 0.98), rgba(7, 10, 18, 0.98));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-  padding: 16px;
+  z-index: 395;
+
+  /* Hidden by default — slides up out of view */
+  transform: translateY(-8px);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+
+  /* Open state applied via .is-open */
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity   0.22s ease,
+    visibility 0s linear 0.28s;
+
+  /* Visuals */
+  background: linear-gradient(180deg, rgba(9, 14, 28, 0.99), rgba(6, 9, 20, 0.99));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 16px 16px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.7);
-  animation: slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 300;
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.75);
+  max-height: calc(100dvh - 58px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.pg-mobile-nav-drawer.is-open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity   0.22s ease,
+    visibility 0s linear 0s;
 }
 
 [data-theme="light"] .pg-mobile-nav-drawer {
-  background: linear-gradient(180deg, rgba(245, 242, 236, 0.98), rgba(235, 231, 222, 0.98));
-  border-bottom-color: rgba(0, 0, 0, 0.14);
+  background: linear-gradient(180deg, rgba(250, 249, 246, 0.99), rgba(242, 240, 236, 0.99));
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
 }
 
+/* ── Drawer: page navigation links ─────────────────────────────────── */
 .pg-mobile-nav-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .pg-mobile-nav-link {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 16px;
-  min-height: 48px;
-  border-radius: 12px;
-  color: #cbd5e1;
+  padding: 13px 16px;
+  min-height: 52px;
+  border-radius: 14px;
+  color: #94a3b8;
   font-family: var(--display);
   font-size: 15px;
   font-weight: 600;
   text-decoration: none;
   border: 1px solid transparent;
-  transition: all 0.2s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 }
 
-.pg-mobile-nav-link:hover,
+.pg-mobile-nav-link:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+}
+
 .pg-mobile-nav-link.active {
-  background: rgba(99, 102, 241, 0.18);
-  border-color: rgba(99, 102, 241, 0.35);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.22), rgba(56, 189, 248, 0.14));
+  border-color: rgba(99, 102, 241, 0.38);
   color: #ffffff;
 }
 
 [data-theme="light"] .pg-mobile-nav-link {
-  color: #475569;
+  color: #64748b;
 }
 
-[data-theme="light"] .pg-mobile-nav-link:hover,
+[data-theme="light"] .pg-mobile-nav-link:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #1e293b;
+}
+
 [data-theme="light"] .pg-mobile-nav-link.active {
   background: rgba(79, 70, 229, 0.1);
+  border-color: rgba(79, 70, 229, 0.28);
   color: #4f46e5;
 }
 
+/* Active page indicator dot on the right */
+.pg-mobile-active-indicator {
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+  flex-shrink: 0;
+}
+
+/* ── Drawer: footer ─────────────────────────────────────────────────── */
 .pg-mobile-drawer-footer {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .pg-mobile-drawer-footer {
+  border-top-color: rgba(0, 0, 0, 0.1);
 }
 
 .pg-mobile-guest-info {
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid rgba(245, 158, 11, 0.25);
   border-radius: 14px;
-  padding: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -4598,12 +4751,15 @@ body.pg-sidebar-resizing * {
   display: flex;
   align-items: center;
   gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .pg-mobile-guest-text {
   font-family: var(--body);
   font-size: 12px;
   color: #cbd5e1;
+  line-height: 1.5;
   margin: 0;
 }
 
@@ -4618,55 +4774,117 @@ body.pg-sidebar-resizing * {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 46px;
+  min-height: 48px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
   font-family: var(--display);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.pg-mobile-drawer-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+[data-theme="light"] .pg-mobile-drawer-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #475569;
+}
+
+[data-theme="light"] .pg-mobile-drawer-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #1e293b;
 }
 
 .pg-mobile-btn-primary {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: rgba(99, 102, 241, 0.4);
-  color: #818cf8;
+  background: rgba(99, 102, 241, 0.18) !important;
+  border-color: rgba(99, 102, 241, 0.38) !important;
+  color: #818cf8 !important;
 }
 
-/* Touch Target Minimum (44px) Enforcements for Touch Viewports */
-@media (max-width: 768px) {
+.pg-mobile-btn-primary:hover {
+  background: rgba(99, 102, 241, 0.28) !important;
+  color: #ffffff !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE BREAKPOINT — ≤ 767px
+   Show hamburger, hide desktop nav, compact topbar.
+══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  /* Show the hamburger toggle */
   .pg-mobile-hamburger-btn {
     display: flex;
   }
 
+  /* Hide the horizontal desktop nav links */
   .pg-desktop-nav {
     display: none;
   }
 
+  /* Compact topbar height */
   .pg-topbar-inner {
-    padding: 0 16px;
+    padding: 0 14px;
     height: 58px;
   }
 
+  /* Drawer top must match topbar height */
+  .pg-mobile-nav-drawer {
+    top: 58px;
+  }
+
+  /* Brand tweaks */
   .pg-brand-name {
     font-size: 15px;
   }
 
-  .pg-account-badge-btn,
+  /* Hide text labels inside the account/guest badges — keep avatar only */
+  .pg-account-label,
+  .pg-role-tag {
+    display: none;
+  }
+  .pg-account-badge-btn {
+    padding: 4px;
+    gap: 0;
+    border-radius: 50%;
+  }
+  .pg-guest-label {
+    display: none;
+  }
   .pg-guest-badge-btn {
-    min-height: 44px;
-    padding: 6px 12px;
+    padding: 8px 10px;
   }
 
-  .pg-settings-trigger-btn {
+  /* Ensure all interactive controls have 44px tap target */
+  .pg-account-badge-btn,
+  .pg-guest-badge-btn,
+  .pg-settings-trigger-btn,
+  .pg-mobile-hamburger-btn {
     min-width: 44px;
     min-height: 44px;
   }
 
+  /* Right section gap reduction */
+  .pg-topbar-right {
+    gap: 8px;
+  }
+
+  /* No horizontal scrollbars on 320px – 430px */
+  html, body, #root, .pg-app-container, .pg-main, .pg-landing-v2 {
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+  }
+
+  /* General interactive elements: min 44px height */
   .pg-btn-hero-primary,
   .pg-btn-hero-secondary,
   .pg-btn-primary,
@@ -4679,23 +4897,7 @@ body.pg-sidebar-resizing * {
     justify-content: center;
   }
 
-  /* No horizontal scrollbars on 320px - 430px */
-  html, body, #root, .pg-app-container, .pg-main, .pg-landing-v2 {
-    max-width: 100vw;
-    overflow-x: hidden;
-    box-sizing: border-box;
-  }
-
-  .pg-hero-main-content,
-  .pg-feature-tab-card,
-  .pg-calculator-card,
-  .pg-cta-card {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    padding: 20px 16px;
-  }
-
+  /* Hero section */
   .pg-hero-headline {
     font-size: clamp(26px, 7.5vw, 36px);
   }
@@ -4722,5 +4924,684 @@ body.pg-sidebar-resizing * {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE-FIRST RESPONSIVE OVERRIDES — covers 320px → 576px → 768px → 992px
+   ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── 0 → 575px: Base Mobile (320px phones) ──────────────────────────────── */
+@media (max-width: 575px) {
 
+  /* --- Global typography scale-down --- */
+  body {
+    font-size: 14px;
+  }
+
+  /* --- Topbar: tight height and padding --- */
+  .pg-topbar-inner {
+    height: 54px !important;
+    padding: 0 12px !important;
+    gap: 8px !important;
+  }
+
+  .pg-brand-name {
+    font-size: 14px !important;
+  }
+
+  .pg-brand-tag {
+    display: none;
+  }
+
+  /* Hide account label text, keep avatar circle only */
+  .pg-account-label,
+  .pg-role-tag {
+    display: none;
+  }
+
+  .pg-account-badge-btn {
+    padding: 4px 6px !important;
+    gap: 0 !important;
+    border-radius: 50% !important;
+  }
+
+  /* Settings and hamburger: enforce tap targets */
+  .pg-settings-trigger-btn {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+
+  /* --- Main page content: reduce padding --- */
+  .pg-main {
+    padding: 16px 12px 24px !important;
+    min-height: calc(100vh - 54px) !important;
+  }
+
+  /* --- Cards: reduce internal padding on tiny screens --- */
+  .pg-card {
+    padding: 16px !important;
+    border-radius: 14px !important;
+  }
+
+  .pg-card-sm {
+    padding: 12px 14px !important;
+  }
+
+  /* --- Stat grid: 2 columns on mobile instead of 4 --- */
+  .pg-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .pg-stat {
+    padding: 14px !important;
+  }
+
+  .pg-stat-value {
+    font-size: 22px !important;
+  }
+
+  /* --- Scan form: stack input above button on narrow screens --- */
+  .pg-scan-form,
+  form.pg-scan-form,
+  .pg-card form[class=""],
+  .pg-card > form {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .pg-input {
+    min-height: 44px !important;
+    font-size: 14px !important;
+  }
+
+  .pg-btn-primary {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* --- Row utilities: wrap and stack on mobile --- */
+  .pg-row-between {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* --- Page header: stack title and actions --- */
+  .pg-page-header-actions {
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .pg-page-title {
+    font-size: 20px !important;
+  }
+
+  /* --- Onboarding block --- */
+  .pg-onboard-list {
+    gap: 6px !important;
+  }
+
+  /* --- Popover: cap width and snap to viewport on tiny screens --- */
+  .pg-glass-popover {
+    width: calc(100vw - 24px) !important;
+    max-width: 280px !important;
+    right: -4px !important;
+  }
+
+  /* Mobile navigation drawer: full width --- */
+  .pg-mobile-nav-drawer {
+    padding: 12px !important;
+    gap: 12px !important;
+  }
+
+  .pg-mobile-nav-link {
+    padding: 10px 14px !important;
+    min-height: 44px !important;
+    font-size: 14px !important;
+  }
+
+  .pg-mobile-drawer-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* --- Landing page v2 hero: single column, smaller padding --- */
+  .pg-landing-v2 {
+    padding: 72px 14px 40px !important;
+    gap: 40px !important;
+  }
+
+  .pg-landing-hero {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+
+  .pg-hero-main-content {
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  .pg-hero-badge-pill {
+    align-self: center !important;
+  }
+
+  .pg-hero-headline {
+    font-size: clamp(26px, 7.5vw, 36px) !important;
+    text-align: center !important;
+  }
+
+  .pg-hero-subhead {
+    max-width: 100% !important;
+    text-align: center !important;
+    font-size: 14px !important;
+  }
+
+  .pg-hero-cta-group {
+    width: 100% !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .pg-btn-hero-primary,
+  .pg-btn-hero-secondary {
+    width: 100% !important;
+    min-height: 48px !important;
+    font-size: 15px !important;
+  }
+
+  .pg-hero-metrics-strip {
+    flex-wrap: wrap !important;
+    gap: 14px !important;
+    justify-content: center !important;
+  }
+
+  .pg-metric-divider {
+    display: none !important;
+  }
+
+  /* Demo card: reduce padding, stack verdict layout */
+  .pg-hero-demo-card {
+    padding: 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .pg-demo-verdict-layout {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 14px !important;
+  }
+
+  .pg-verdict-tech-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Sample chips: wrap and fill on mobile */
+  .pg-sample-chips-row {
+    gap: 6px !important;
+  }
+
+  .pg-sample-chip {
+    min-height: 36px !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+  }
+
+  /* Demo input bar: shrink scan button */
+  .pg-demo-input-bar {
+    padding: 6px !important;
+  }
+
+  .pg-btn-demo-scan {
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+  }
+
+  /* --- Feature tabs: stack two-column cards --- */
+  .pg-feature-tabs-nav {
+    gap: 6px !important;
+  }
+
+  .pg-feature-tab-btn {
+    padding: 10px 14px !important;
+    font-size: 12px !important;
+  }
+
+  .pg-feature-tab-card {
+    grid-template-columns: 1fr !important;
+    padding: 20px 16px !important;
+    gap: 20px !important;
+    border-radius: 16px !important;
+  }
+
+  .pg-tab-metrics-row {
+    flex-wrap: wrap !important;
+    gap: 16px !important;
+  }
+
+  /* --- Calculator card: stack columns --- */
+  .pg-calculator-card {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+    padding: 20px 16px !important;
+    border-radius: 16px !important;
+  }
+
+  /* --- Live feed rows: simplify 4-col grid to 2-col --- */
+  .pg-feed-row {
+    grid-template-columns: 90px 1fr !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+
+  .pg-feed-source {
+    display: none !important;
+  }
+
+  /* --- Trust brand pills: center and wrap --- */
+  .pg-trust-logos {
+    gap: 8px !important;
+  }
+
+  .pg-trust-brand-pill {
+    font-size: 11px !important;
+    padding: 6px 12px !important;
+  }
+
+  /* --- CTA banner: reduce padding --- */
+  .pg-cta-banner {
+    padding: 32px 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .pg-cta-btn-group {
+    flex-direction: column !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .pg-cta-btn-group > * {
+    width: 100% !important;
+  }
+
+  /* --- Section header and titles --- */
+  .pg-section-wrapper {
+    gap: 20px !important;
+  }
+
+  /* --- Auth pages: less padding --- */
+  .pg-auth-page {
+    padding: 16px !important;
+    align-items: flex-start !important;
+    padding-top: 40px !important;
+  }
+
+  .pg-auth-card {
+    padding: 24px 18px !important;
+    border-radius: 18px !important;
+  }
+
+  /* --- Modal cards --- */
+  .pg-modal-card {
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+
+  /* --- History / Analytics page filter controls --- */
+  .pg-filter-bar {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .pg-select-control {
+    min-width: 100% !important;
+  }
+
+  .pg-filter-btn,
+  .pg-page-btn {
+    min-height: 44px !important;
+    padding: 0 14px !important;
+    font-size: 12px !important;
+  }
+
+  /* --- Onboarding quick-start --- */
+  .pg-row-wrap {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .pg-row-wrap > button {
+    width: 100% !important;
+  }
+
+  /* --- Empty state: tighter padding --- */
+  .pg-empty-state {
+    padding: 36px 16px !important;
+  }
+
+  /* --- Sidebar always hidden off-canvas on mobile --- */
+  .pg-sidebar {
+    width: min(82vw, 280px) !important;
+  }
+
+  /* --- Legacy landing page (old version) --- */
+  .pg-landing-page {
+    padding: 62px 12px 14px !important;
+  }
+
+  .pg-hero-shell {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .pg-hero-copy,
+  .pg-feed-panel {
+    padding: 16px !important;
+  }
+}
+
+/* ── 576px → 767px: Small Tablets / Large Phones ───────────────────────── */
+@media (min-width: 576px) and (max-width: 767px) {
+
+  /* Stat grid: 2 columns */
+  .pg-stats {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Landing hero: single column */
+  .pg-landing-hero {
+    grid-template-columns: 1fr !important;
+    gap: 28px !important;
+  }
+
+  .pg-hero-main-content {
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  .pg-hero-subhead {
+    max-width: 100% !important;
+    text-align: center !important;
+  }
+
+  .pg-hero-cta-group {
+    justify-content: center !important;
+  }
+
+  /* Feature tab card: single column */
+  .pg-feature-tab-card,
+  .pg-calculator-card {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+
+  /* Feed rows: simplify */
+  .pg-feed-row {
+    grid-template-columns: 80px 1fr auto !important;
+    gap: 10px !important;
+  }
+
+  /* Main padding */
+  .pg-main {
+    padding: 24px 16px !important;
+  }
+
+  /* Landing v2 */
+  .pg-landing-v2 {
+    padding: 80px 20px 48px !important;
+    gap: 52px !important;
+  }
+}
+
+/* ── 768px → 991px: Tablets ─────────────────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 991px) {
+
+  /* Stat grid: 4 columns still OK but reduce gap */
+  .pg-stats {
+    gap: 10px !important;
+  }
+
+  /* Landing hero: single column */
+  .pg-landing-hero {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
+
+  .pg-hero-main-content {
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  .pg-hero-subhead {
+    max-width: 560px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .pg-hero-cta-group {
+    justify-content: center !important;
+  }
+
+  /* Feature tab card: keep side by side */
+  .pg-feature-tab-card {
+    gap: 24px !important;
+    padding: 28px !important;
+  }
+
+  /* Calculator card: single column */
+  .pg-calculator-card {
+    grid-template-columns: 1fr !important;
+    gap: 28px !important;
+  }
+
+  .pg-main {
+    padding: 28px 20px !important;
+  }
+
+  .pg-landing-v2 {
+    padding: 84px 24px 56px !important;
+    gap: 60px !important;
+  }
+}
+
+/* ── 992px+: Desktop — restore all desktop behaviours ───────────────────── */
+@media (min-width: 992px) {
+  .pg-stats {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+
+  .pg-landing-hero {
+    grid-template-columns: 1.1fr 0.9fr !important;
+  }
+
+  .pg-hero-main-content {
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
+
+  .pg-hero-subhead {
+    text-align: left !important;
+  }
+
+  .pg-hero-cta-group {
+    justify-content: flex-start !important;
+  }
+
+  .pg-feature-tab-card {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .pg-calculator-card {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GRID & MULTI-COLUMN LAYOUT STANDARD (MOBILE-FIRST BREAKPOINTS)
+   ─────────────────────────────────────────────────────────────────────────
+   Below 640px : 1 Column stacking
+   640px - 991px: 2 Columns on tablets
+   992px+      : 3-4 Columns on desktop (or auto-fit minmax(280px, 1fr))
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Default / Base Fluid Auto-Fit standard for reusable grid utilities */
+.pg-responsive-grid,
+.pg-grid-auto-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+}
+
+/* --- Below 640px: Strictly 1 Column for all multi-column sections --- */
+@media (max-width: 639px) {
+  .pg-stats,
+  .pg-stat-grid,
+  .pg-stats-band,
+  .pg-comparison-grid,
+  .pg-visibility-band,
+  .pg-hero-rules,
+  .pg-feed-strip,
+  .pg-landing-hero,
+  .pg-feature-tab-card,
+  .pg-calculator-card,
+  .pg-chart-grid,
+  .pg-hero-shell,
+  .pg-proof-grid,
+  .pg-responsive-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pg-stat-item {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+
+  .pg-stat-item:last-child {
+    border-bottom: none !important;
+  }
+
+  .pg-hero-rules > div:not(:last-child),
+  .pg-feed-strip > div:not(:last-child) {
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding-bottom: 10px !important;
+  }
+}
+
+/* --- 640px to 991px (Tablets): 2 Columns --- */
+@media (min-width: 640px) and (max-width: 991px) {
+  .pg-stats,
+  .pg-stat-grid,
+  .pg-stats-band,
+  .pg-comparison-grid,
+  .pg-visibility-band,
+  .pg-hero-rules,
+  .pg-feed-strip,
+  .pg-responsive-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .pg-stat-item:nth-child(2n) {
+    border-right: none !important;
+  }
+
+  .pg-stat-item:nth-child(1),
+  .pg-stat-item:nth-child(2) {
+    border-bottom: 1px solid var(--border) !important;
+  }
+}
+
+/* --- 992px+ (Desktop): 3 to 4 Columns --- */
+@media (min-width: 992px) {
+  .pg-stats,
+  .pg-stats-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .pg-visibility-band,
+  .pg-hero-rules,
+  .pg-feed-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .pg-comparison-grid,
+  .pg-feature-tab-card,
+  .pg-calculator-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FLUID TYPOGRAPHY & FORM INPUT SCALING STANDARDS
+   ─────────────────────────────────────────────────────────────────────────
+   1. Headings use clamp() to shrink gracefully across mobile and desktop
+   2. All form inputs set to width: 100% with minimum 16px font-size on mobile
+      to eliminate iOS WebKit auto-zooming on focus.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Global Fluid Headings */
+h1 {
+  font-size: clamp(28px, 6vw, 48px);
+  line-height: 1.15;
+}
+
+h2 {
+  font-size: clamp(22px, 4.5vw, 36px);
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: clamp(18px, 3.5vw, 26px);
+  line-height: 1.3;
+}
+
+h4, h5, h6 {
+  font-size: clamp(15px, 2.5vw, 20px);
+  line-height: 1.4;
+}
+
+.pg-page-title {
+  font-size: clamp(22px, 4.5vw, 30px);
+}
+
+.pg-section-title {
+  font-size: clamp(16px, 3.5vw, 22px);
+}
+
+.pg-hero-headline {
+  font-size: clamp(26px, 7vw, 56px);
+}
+
+.pg-cta-title {
+  font-size: clamp(22px, 5vw, 40px);
+}
+
+.pg-tab-headline {
+  font-size: clamp(18px, 3.5vw, 24px);
+}
+
+/* ── Form Inputs Base Standard ── */
+input,
+select,
+textarea,
+.pg-input,
+.pg-field-input,
+.pg-select-control,
+.pg-demo-url-field {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Prevent iOS Safari auto-zooming by enforcing min 16px on mobile viewports ── */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  .pg-input,
+  .pg-field-input,
+  .pg-select-control,
+  .pg-demo-url-field {
+    font-size: 16px !important;
+    width: 100% !important;
+  }
+}

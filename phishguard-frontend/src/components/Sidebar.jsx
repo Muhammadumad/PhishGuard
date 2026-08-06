@@ -270,6 +270,11 @@ export default function Sidebar() {
                   color: "var(--text-2)",
                   cursor: "pointer",
                   fontSize: "18px",
+                  minHeight: "44px",
+                  minWidth: "44px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
                 ✕

@@ -345,7 +345,7 @@ export default function History() {
         className="pg-card"
         style={{ padding: 0, overflow: "hidden", marginBottom: "20px" }}
       >
-        <div style={{ overflowX: "auto" }}>
+        <div className="pg-table-responsive" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           <table className="pg-table" style={{ minWidth: "580px" }}>
             <thead>
               <tr>

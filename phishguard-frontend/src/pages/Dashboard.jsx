@@ -691,7 +691,7 @@ export default function Dashboard() {
       {/* ── Scan input ─────────────────────────────────── */}
       <div className="pg-card" style={{ marginBottom: "24px" }}>
         <div className="pg-section-title">Scan a URL</div>
-        <form onSubmit={handleScan} style={{ display: "flex", gap: "10px" }}>
+        <form onSubmit={handleScan} className="pg-scan-form" style={{ display: "flex", gap: "10px" }}>
           <input
             className="pg-input"
             value={urlInput}

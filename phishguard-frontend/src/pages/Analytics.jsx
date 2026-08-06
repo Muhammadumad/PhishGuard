@@ -1230,7 +1230,7 @@ export default function Analytics() {
           </span>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div className="pg-table-responsive" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           <table className="pg-table" style={{ minWidth: "520px" }}>
             <thead>
               <tr>
@@ -1311,6 +1311,7 @@ export default function Analytics() {
 
       {/* ── Stat cards — 5 cards including avg risk ──────── */}
       <div
+        className="pg-stat-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
@@ -1426,6 +1427,7 @@ export default function Analytics() {
 
           {/* Donut + Bar — side by side */}
           <div
+            className="pg-chart-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
@@ -1502,7 +1504,7 @@ export default function Analytics() {
               )}
             </div>
 
-            <div style={{ overflowX: "auto" }}>
+            <div className="pg-table-responsive" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table className="pg-table" style={{ minWidth: "480px" }}>
                 <thead>
                   <tr>

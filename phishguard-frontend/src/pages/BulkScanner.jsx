@@ -437,6 +437,7 @@ export default function BulkScanner() {
       {/* ── Live summary cards — show as soon as first result arrives ── */}
       {results.length > 0 && (
         <div
+          className="pg-stat-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
@@ -525,7 +526,7 @@ export default function BulkScanner() {
             )}
           </div>
 
-          <div style={{ overflowX: "auto" }}>
+          <div className="pg-table-responsive" style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <table className="pg-table" style={{ minWidth: "520px" }}>
               <thead>
                 <tr>
