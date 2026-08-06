@@ -21,6 +21,8 @@ except ModuleNotFoundError:
 
 from .models import URL as URLModel, ScanResult, BlacklistedDomain
 from .analyzer import extract_features, _load_thresholds
+from .virustotal import check_virustotal
+from .safebrowsing import check_google_safe_browsing
 
 
 TRACKING_PARAMS = {
@@ -179,6 +181,21 @@ def process_url_scan(self, url_id, use_live_signals=True):
                     features["confidence_score"] = float(features.get("risk_score", 0))
                     features["reasons"] = list(features.get("reasons", [])) + reasons
                     features["verdict"] = _compute_verdict(features["risk_score"])
+
+        # ── External Threat Intelligence (VirusTotal & Google Safe Browsing) ──
+        vt_res = check_virustotal(url_clean)
+        if vt_res.get("score_boost", 0) > 0:
+            features["risk_score"] = min(100, int(features.get("risk_score", 0)) + vt_res["score_boost"])
+            features["reasons"] = list(features.get("reasons", [])) + vt_res.get("reasons", [])
+            features["verdict"] = _compute_verdict(features["risk_score"])
+            features["virustotal"] = vt_res
+
+        gsb_res = check_google_safe_browsing(url_clean)
+        if gsb_res.get("score_boost", 0) > 0:
+            features["risk_score"] = min(100, int(features.get("risk_score", 0)) + gsb_res["score_boost"])
+            features["reasons"] = list(features.get("reasons", [])) + gsb_res.get("reasons", [])
+            features["verdict"] = _compute_verdict(features["risk_score"])
+            features["safebrowsing"] = gsb_res
 
         if is_blacklisted:
             features["verdict"] = "phishing"
