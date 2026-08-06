@@ -1,6 +1,5 @@
 {
-  "framework": "vite",
-  "buildCommand": "npm --prefix phishguard-frontend run build",
+  "buildCommand": "cd phishguard-frontend && npm install && npm run build",
   "outputDirectory": "phishguard-frontend/dist",
   "rewrites": [
     {
