@@ -1,12 +1,10 @@
 {
-  "cleanUrls": true,
-  "routes": [
+  "buildCommand": "cd phishguard-frontend && npm install && npm run build",
+  "outputDirectory": "phishguard-frontend/dist",
+  "rewrites": [
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/.*",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
