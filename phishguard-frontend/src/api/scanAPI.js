@@ -144,6 +144,21 @@ export async function scanURL(url) {
   return data;
 }
 
+// ── POST /api/scan/async/ ─────────────────────────────────────────────────────
+export async function scanURLAsync(url, useLiveSignals = false) {
+  const { data } = await api.post("/scan/async/", {
+    url,
+    use_live_signals: useLiveSignals,
+  });
+  return data;
+}
+
+// ── GET /api/scan/task-status/<task_id>/ ──────────────────────────────────────
+export async function fetchTaskStatus(taskId) {
+  const { data } = await api.get(`/scan/task-status/${taskId}/`);
+  return data;
+}
+
 // ── DELETE /api/scan/<id>/delete/ ─────────────────────────────────────────────
 export async function deleteScan(id) {
   if (isGuestSession()) {

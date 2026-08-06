@@ -72,6 +72,62 @@ services:
              python manage.py collectstatic --noinput &&
              gunicorn --config gunicorn.conf.py core.wsgi:application"
 
+  # ── Celery Worker (Async Task Queue Process) ─────────────────────────────
+  celery_worker:
+    build:
+      context: ./phishguard-backend
+      dockerfile: Dockerfile
+    container_name: phishguard_celery_worker
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-prod-secret-key-change-this-in-production-2026}
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=${DB_NAME:-phishguard_db}
+      - DB_USER=${DB_USER:-phishguard_user}
+      - DB_PASSWORD=${DB_PASSWORD:-phishguard_secure_pass_2026}
+      - DB_HOST=db
+      - DB_PORT=3306
+      - USE_REDIS_CACHE=True
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_pass_2026}@redis:6379/0
+    volumes:
+      - backend_logs:/app/logs
+    command: celery -A core worker --loglevel=info --concurrency=4
+
+  # ── Celery Beat (Scheduled Periodic Tasks Engine) ─────────────────────────
+  celery_beat:
+    build:
+      context: ./phishguard-backend
+      dockerfile: Dockerfile
+    container_name: phishguard_celery_beat
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY:-prod-secret-key-change-this-in-production-2026}
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=${DB_NAME:-phishguard_db}
+      - DB_USER=${DB_USER:-phishguard_user}
+      - DB_PASSWORD=${DB_PASSWORD:-phishguard_secure_pass_2026}
+      - DB_HOST=db
+      - DB_PORT=3306
+      - USE_REDIS_CACHE=True
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_pass_2026}@redis:6379/0
+    volumes:
+      - backend_logs:/app/logs
+    command: celery -A core beat --loglevel=info
+
   # ── React Frontend (Nginx Production Server) ─────────────────────────────
   web:
     build:
@@ -81,6 +137,7 @@ services:
     restart: always
     depends_on:
       - backend
+      - celery_worker
     ports:
       - "80:80"
 

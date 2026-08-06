@@ -9,6 +9,8 @@ from . import views
 urlpatterns = [
     # Core scan endpoints
     path("scan/",                    views.ScanView.as_view(),          name="scan"),
+    path("scan/async/",              views.AsyncScanView.as_view(),     name="async_scan"),
+    path("scan/task-status/<str:task_id>/", views.TaskStatusView.as_view(), name="task_status"),
     path("scan/bulk/",              views.BulkScanView.as_view(),      name="bulk_scan"),
     path("scan/bulk-csv/",          views.BulkCSVScanView.as_view(),   name="bulk_csv_scan"),
     path("scan/<int:url_id>/",       views.ScanDetailView.as_view(),    name="scan_detail"),   # NEW v4

@@ -847,3 +847,76 @@ class BlacklistDetailView(APIView):
             return Response({"deleted": True})
         except BlacklistedDomain.DoesNotExist:
             return Response({"error": "Domain not found"}, status=404)
+
+
+# ── Async Task Status Polling & Dispatch ──────────────────────────────────────
+class AsyncScanView(APIView):
+    """
+    POST /api/scan/async/
+    Enqueues URL analysis task to Celery worker and returns task_id & polling URL.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        raw_url = request.data.get("url")
+        raw_url, url_clean, error = _normalize_scan_input(raw_url)
+        if error:
+            return Response({"error": error}, status=400)
+
+        use_live_signals = _as_bool(request.data.get("use_live_signals"), ENABLE_LIVE_SIGNALS)
+        user = request.user if (hasattr(request, "user") and request.user and request.user.is_authenticated) else None
+
+        url_obj = URL.objects.create(
+            url=raw_url,
+            submitted_by=user,
+            status="queued",
+        )
+
+        try:
+            task = process_url_scan.delay(url_obj.id, use_live_signals)
+            task_id = task.id
+        except Exception as e:
+            url_obj.status = "pending"
+            url_obj.save(update_fields=["status"])
+            return Response({"error": f"Failed to dispatch task: {str(e)}"}, status=500)
+
+        return Response({
+            "task_id": task_id,
+            "url_id": url_obj.id,
+            "status": "queued",
+            "input_url": raw_url,
+            "normalized_url": url_clean,
+            "poll_url": f"/api/scan/task-status/{task_id}/",
+        }, status=status.HTTP_202_ACCEPTED)
+
+
+class TaskStatusView(APIView):
+    """
+    GET /api/scan/task-status/<task_id>/
+    Polls status of asynchronous Celery task. Returns state and result payload when completed.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, task_id):
+        try:
+            from celery.result import AsyncResult
+            result = AsyncResult(task_id)
+
+            response_data = {
+                "task_id": task_id,
+                "state": result.state,
+                "ready": result.ready(),
+                "successful": result.successful() if result.ready() else False,
+            }
+
+            if result.ready():
+                if result.successful():
+                    response_data["result"] = result.result
+                else:
+                    response_data["error"] = str(result.result)
+            else:
+                response_data["info"] = str(result.info) if result.info else "Task is processing in background"
+
+            return Response(response_data, status=200)
+        except Exception as e:
+            return Response({"error": f"Failed to check task status: {str(e)}"}, status=500)
