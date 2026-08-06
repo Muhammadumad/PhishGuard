@@ -1,40 +1,19 @@
 // src/App.jsx
-import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import TopNavbar from "./components/TopNavbar";
 import AuthGuard from "./components/AuthGuard";
 
-const loadDashboard = () => import("./pages/Dashboard");
-const loadBulkScanner = () => import("./pages/BulkScanner");
-const loadHistory = () => import("./pages/History");
-const loadAnalytics = () => import("./pages/Analytics");
-const loadQualityCheck = () => import("./pages/QualityCheck");
-const loadLanding = () => import("./pages/Landing");
-const loadLogin = () => import("./pages/Login");
-const loadRegister = () => import("./pages/Register");
-
-const Dashboard = lazy(loadDashboard);
-const BulkScanner = lazy(loadBulkScanner);
-const History = lazy(loadHistory);
-const Analytics = lazy(loadAnalytics);
-const QualityCheck = lazy(loadQualityCheck);
-const Landing = lazy(loadLanding);
-const Login = lazy(loadLogin);
-const Register = lazy(loadRegister);
+import Landing from "./pages/Landing";
+import Dashboard from "./pages/Dashboard";
+import BulkScanner from "./pages/BulkScanner";
+import History from "./pages/History";
+import Analytics from "./pages/Analytics";
+import QualityCheck from "./pages/QualityCheck";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 const PUBLIC_PATHS = ["/"];
 const AUTH_PATHS = ["/login", "/register"];
-
-function RouteLoader() {
-  return (
-    <div className="pg-route-loader">
-      <div className="pg-route-loader-card">
-        <span className="spin">⟳</span>
-        Loading page...
-      </div>
-    </div>
-  );
-}
 
 function Layout() {
   const { pathname } = useLocation();
@@ -43,25 +22,21 @@ function Layout() {
 
   if (isPublic) {
     return (
-      <Suspense fallback={<RouteLoader />}>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     );
   }
 
   // Auth pages: full screen, perfectly centered
   if (isAuth) {
     return (
-      <Suspense fallback={<RouteLoader />}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Suspense>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
     );
   }
 
@@ -69,51 +44,49 @@ function Layout() {
   return (
     <div className="pg-app-container">
       <TopNavbar />
-      <Suspense fallback={<RouteLoader />}>
-        <Routes>
-          <Route
-            path="/dashboard"
-            element={
-              <AuthGuard>
-                <Dashboard />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/bulk"
-            element={
-              <AuthGuard>
-                <BulkScanner />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/history"
-            element={
-              <AuthGuard>
-                <History />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/analytics"
-            element={
-              <AuthGuard>
-                <Analytics />
-              </AuthGuard>
-            }
-          />
-          <Route
-            path="/qa"
-            element={
-              <AuthGuard>
-                <QualityCheck />
-              </AuthGuard>
-            }
-          />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </Suspense>
+      <Routes>
+        <Route
+          path="/dashboard"
+          element={
+            <AuthGuard>
+              <Dashboard />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/bulk"
+          element={
+            <AuthGuard>
+              <BulkScanner />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <AuthGuard>
+              <History />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <AuthGuard>
+              <Analytics />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/qa"
+          element={
+            <AuthGuard>
+              <QualityCheck />
+            </AuthGuard>
+          }
+        />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
     </div>
   );
 }
@@ -121,4 +94,3 @@ function Layout() {
 export default function App() {
   return <Layout />;
 }
-
