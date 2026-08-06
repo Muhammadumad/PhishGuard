@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd phishguard-frontend && npm install && npm run build",
+  "outputDirectory": "phishguard-frontend/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
