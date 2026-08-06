@@ -24,4 +24,7 @@ urlpatterns = [
     # Blacklist management
     path("blacklist/",               views.BlacklistView.as_view(),     name="blacklist"),
     path("blacklist/<int:domain_id>/",views.BlacklistDetailView.as_view(), name="blacklist_detail"),  # NEW v4
+
+    # SIEM / SOC Export
+    path("export/siem/",             views.SIEMExportView.as_view(),    name="export_siem"),
 ]

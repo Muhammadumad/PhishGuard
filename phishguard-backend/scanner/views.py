@@ -919,4 +919,56 @@ class TaskStatusView(APIView):
 
             return Response(response_data, status=200)
         except Exception as e:
-            return Response({"error": f"Failed to check task status: {str(e)}"}, status=500)
+            return Response({"error": f"Failed to check task status: {str(e)}"}, status=500)
+
+
+# ── SIEM / SOC Incident Log Export (CEF & JSON) ──────────────────────────────
+class SIEMExportView(APIView):
+    """
+    GET /api/export/siem/?format=cef|json&verdict=phishing|suspicious
+    Exports threat incidents for Splunk, Microsoft Sentinel, and SIEM ingesters.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        fmt = request.query_params.get("format", "json").lower()
+        verdict_filter = request.query_params.get("verdict", "phishing")
+
+        queryset = ScanResult.objects.select_related("url").filter(
+            verdict__in=["phishing", "suspicious"] if verdict_filter == "all" else [verdict_filter]
+        ).order_by("-scan_date")[:500]
+
+        if fmt == "cef":
+            from django.http import HttpResponse
+            cef_lines = []
+            for item in queryset:
+                # CEF:Version|Device Vendor|Device Product|Device Version|Signature ID|Name|Severity|Extension
+                sev = "10" if item.verdict == "phishing" else "6"
+                reasons_str = "; ".join(item.reasons) if isinstance(item.reasons, list) else str(item.reasons)
+                url_str = item.url.url if item.url else ""
+                cef_line = f"CEF:0|PhishGuard|ThreatConsole|1.0.0|THREAT_DETECTED|Phishing URL Flagged|{sev}|request={url_str} riskScore={item.risk_score} verdict={item.verdict} msg={reasons_str}"
+                cef_lines.append(cef_line)
+
+            response = HttpResponse("\n".join(cef_lines), content_type="text/plain")
+            response["Content-Disposition"] = 'attachment; filename="phishguard_threats.cef"'
+            return response
+
+        # Default JSON format
+        incidents = []
+        for item in queryset:
+            incidents.append({
+                "id": item.id,
+                "url": item.url.url if item.url else "",
+                "verdict": item.verdict,
+                "risk_score": item.risk_score,
+                "confidence_score": item.confidence_score,
+                "reasons": item.reasons,
+                "timestamp": item.scan_date.isoformat() if item.scan_date else None,
+            })
+
+        return Response({
+            "count": len(incidents),
+            "format": "json",
+            "incidents": incidents,
+        }, status=200)
+

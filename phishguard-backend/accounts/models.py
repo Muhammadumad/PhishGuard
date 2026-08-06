@@ -92,3 +92,33 @@ class SecurityEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
+
+
+class APIKey(models.Model):
+    """
+    Enterprise API Key for automated SOC/SIEM integrations.
+    Authenticated requests use `X-API-Key: pg_live_...` header.
+    """
+    id = models.BigAutoField(primary_key=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="api_keys",
+    )
+    name = models.CharField(max_length=100)
+    key_prefix = models.CharField(max_length=12, db_index=True)
+    key_hash = models.CharField(max_length=128, db_index=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "api_keys"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["key_prefix"], name="idx_apk_prefix"),
+            models.Index(fields=["key_hash"], name="idx_apk_hash"),
+        ]
+
+    def __str__(self):
+        return f"APIKey '{self.name}' ({self.key_prefix}...)"
