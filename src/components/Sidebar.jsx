@@ -9,7 +9,7 @@ import {
   Search,
   ExclamationCircle,
 } from "react-bootstrap-icons";
-import useAuthStore from "../store/authStore";
+import useAuthStore from "../store/AuthStore";
 
 let qaPrefetched = false;
 

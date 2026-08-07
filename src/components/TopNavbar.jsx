@@ -17,7 +17,7 @@ import {
   Sliders,
   X,
 } from "react-bootstrap-icons";
-import useAuthStore from "../store/authStore";
+import useAuthStore from "../store/AuthStore";
 import useThemeStore from "../store/ThemeStore";
 import usePerformanceStore from "../store/PerformanceStore";
 

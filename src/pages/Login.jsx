@@ -1,7 +1,7 @@
 // src/pages/Login.jsx
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import useAuthStore from "../store/authStore";
+import useAuthStore from "../store/AuthStore";
 import { loginUser, fetchProfile } from "../api/AuthAPI";
 
 function Field({ label, type = "text", value, onChange, error, placeholder }) {

@@ -1,7 +1,7 @@
 // src/pages/Register.jsx
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import useAuthStore from "../store/authStore";
+import useAuthStore from "../store/AuthStore";
 import { registerUser } from "../api/AuthAPI";
 
 // ── Reusable field (same as Login) ───────────────────────────────────────────

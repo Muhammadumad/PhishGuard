@@ -18,7 +18,7 @@ import {
   Terminal,
   XCircleFill,
 } from "react-bootstrap-icons";
-import useAuthStore from "../store/authStore";
+import useAuthStore from "../store/AuthStore";
 
 const SAMPLE_URLS = [
   {
