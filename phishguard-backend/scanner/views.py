@@ -28,12 +28,14 @@ from .models import URL, ScanResult, BlacklistedDomain, CachedScan
 from .serializers import URLSerializer, ScanResultSerializer, BlacklistSerializer
 from .analyzer import extract_features, _load_thresholds
 from .tasks import process_url_scan
+from .virustotal import check_virustotal
+from .safebrowsing import check_google_safe_browsing
 
 BULK_SCAN_MAX_URLS = 100
 LIVE_SIGNAL_CACHE_TTL = 3600
 
-# Keep the default scan path fast. Live DNS/TLS enrichment stays opt-in.
-ENABLE_LIVE_SIGNALS = False
+# Live DNS, TLS, VirusTotal & Google Safe Browsing enrichment enabled by default
+ENABLE_LIVE_SIGNALS = True
 
 # ── Tracking params to strip before scanning ──────────────────────────────────
 TRACKING_PARAMS = {
@@ -184,6 +186,24 @@ def enrich_with_live_network_signals(url_clean, features):
             reasons.append("TLS certificate verification failed")
         except Exception:
             pass
+
+    # VirusTotal live intelligence check (if API key configured)
+    try:
+        vt_res = check_virustotal(url_clean)
+        if vt_res.get("enabled") and vt_res.get("score_boost", 0) > 0:
+            risk_delta += int(vt_res["score_boost"])
+            reasons.extend(vt_res.get("reasons", []))
+    except Exception:
+        pass
+
+    # Google Safe Browsing v4 live threat check (if API key configured)
+    try:
+        gsb_res = check_google_safe_browsing(url_clean)
+        if gsb_res.get("enabled") and gsb_res.get("score_boost", 0) > 0:
+            risk_delta += int(gsb_res["score_boost"])
+            reasons.extend(gsb_res.get("reasons", []))
+    except Exception:
+        pass
 
     if risk_delta <= 0:
         return features

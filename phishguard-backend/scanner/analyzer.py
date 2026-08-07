@@ -26,6 +26,7 @@
 import re
 import ipaddress
 import json
+import math
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 
@@ -42,6 +43,40 @@ CHAR_SKELETON_MAP = str.maketrans({
     "@": "a",
     "$": "s",
 })
+
+
+def _shannon_entropy(text: str) -> float:
+    """Calculate Shannon entropy of a string (measures randomness/DGA)."""
+    if not text:
+        return 0.0
+    prob = [float(text.count(c)) / len(text) for c in set(text)]
+    return -sum(p * math.log2(p) for p in prob)
+
+
+def _is_obfuscated_ip_host(host: str) -> bool:
+    """Detect octal (0300.0250.0.1), hex (0x7f.0.0.1), or dword (2130706433) IP notation."""
+    if host.isdigit() and int(host) > 65535:
+        return True
+    if re.search(r'0x[0-9a-f]+', host, re.I):
+        return True
+    if re.search(r'\b0[0-7]{2,}\.\d', host):
+        return True
+    return False
+
+
+OPEN_REDIRECT_KEYS = {
+    "url", "redirect", "goto", "target", "dest", "destination",
+    "next", "link", "r", "out", "forward", "return", "to", "u", "ref_url"
+}
+
+
+def _check_open_redirect(parsed_query: dict) -> tuple[bool, str | None]:
+    for key, values in parsed_query.items():
+        if key.lower() in OPEN_REDIRECT_KEYS:
+            for val in values:
+                if re.match(r"^https?://", val, re.I) or val.startswith("//"):
+                    return True, val
+    return False, None
 
 
 def _tokenize(text: str) -> set:
@@ -197,10 +232,10 @@ KNOWN_PHISHING = {
 TRUSTED_DOMAINS = {
     # Google
     "google.com", "gmail.com", "youtube.com", "googleapis.com",
-    "googletagmanager.com", "google.co.uk",
+    "googletagmanager.com", "google.co.uk", "appspot.com",
     # Microsoft
     "microsoft.com", "office.com", "live.com", "outlook.com",
-    "azure.com", "office365.com", "microsoftonline.com",
+    "azure.com", "office365.com", "microsoftonline.com", "azurewebsites.net",
     # Apple
     "apple.com", "icloud.com", "itunes.com",
     # Amazon
@@ -211,16 +246,20 @@ TRUSTED_DOMAINS = {
     # Social
     "twitter.com", "x.com", "linkedin.com",
     "tiktok.com", "snapchat.com", "pinterest.com",
-    # Dev
-    "github.com", "github.io", "githubusercontent.com",
+    # Dev & Modern Cloud Platforms (Upstash, Neon, Supabase, Render, Vercel, Netlify, etc.)
+    "github.com", "github.io", "githubusercontent.com", "github.dev",
     "gitlab.com", "bitbucket.org", "stackoverflow.com",
     "stackexchange.com", "npmjs.com", "python.org",
-    "developer.mozilla.org",
-    # Banking — ADDED v4
+    "developer.mozilla.org", "upstash.com", "neon.tech", "supabase.com",
+    "render.com", "fly.io", "railway.app", "deno.dev", "cloudflare.com",
+    "cloudflare.net", "pages.dev", "workers.dev", "codesandbox.io",
+    "replit.com", "glitch.me", "firebaseapp.com", "web.app",
+    "vercel.com", "vercel.app", "netlify.com", "netlify.app",
+    # Banking
     "chase.com", "wellsfargo.com", "bankofamerica.com",
     "citibank.com", "hsbc.com", "barclays.co.uk",
     "lloydsbank.com", "natwest.com",
-    # Crypto — ADDED v4 (only the real ones)
+    # Crypto
     "binance.com", "coinbase.com", "kraken.com",
     "blockchain.com", "etherscan.io",
     # Streaming
@@ -230,11 +269,10 @@ TRUSTED_DOMAINS = {
     "wikipedia.org", "wikimedia.org",
     "reddit.com", "paypal.com", "ebay.com",
     "anthropic.com", "openai.com",
-    "cloudflare.com", "mozilla.org",
-    "stripe.com", "slack.com", "zoom.us",
-    "dropbox.com", "notion.so",
-    "shopify.com", "vercel.com", "netlify.com",
-    "twitch.tv", "discord.com",
+    "mozilla.org", "stripe.com", "slack.com", "zoom.us",
+    "dropbox.com", "notion.so", "notion.site", "shopify.com",
+    "twitch.tv", "discord.com", "figma.com", "canva.com",
+    "postman.com", "atlassian.net", "jira.com", "sentry.io",
 }
 
 # ── High-risk TLDs (+25 pts) ──────────────────────────────────────────────────
@@ -540,11 +578,34 @@ def extract_features(url: str) -> dict:
     if has_ip:
         points += 30
         reasons.append("Uses IP address instead of domain name — highly suspicious")
+    elif _is_obfuscated_ip_host(bare):
+        points += 35
+        reasons.append("Obfuscated IP host format (hex/octal/dword) — evasion attempt")
+
+    # ── Embedded HTTP credentials in URL (+25) ──────────────────────────────
+    if parsed.username or parsed.password:
+        points += 25
+        reasons.append("Embedded credentials in URL — phishing credential theft trick")
 
     # ── @ symbol redirect trick (+20) ─────────────────────────────────────────
     if feats["has_at_symbol"]:
         points += 20
         reasons.append("Contains @ symbol — browser redirect trick")
+
+    # ── Open redirect parameter (+18) ────────────────────────────────────────
+    has_open_redirect, redirect_target = _check_open_redirect(parse_qs(parsed.query))
+    if has_open_redirect:
+        points += 18
+        reasons.append(f"Open redirect parameter detected pointing to external target")
+
+    # ── Shannon Entropy check on domain labels (+12) ────────────────────────
+    high_entropy_labels = []
+    for label in parts[:-1]:
+        if len(label) >= 8 and _shannon_entropy(label) > 4.15:
+            high_entropy_labels.append(label)
+    if high_entropy_labels:
+        points += 12
+        reasons.append(f"High character randomness in domain label (potential DGA/obfuscated host)")
 
     # ── Punycode homograph (+30) ──────────────────────────────────────────────
     if feats["has_punycode"]:
