@@ -25,7 +25,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 
 from .models import URL, ScanResult, BlacklistedDomain, CachedScan
-from .serializers import URLSerializer, BlacklistSerializer
+from .serializers import URLSerializer, ScanResultSerializer, BlacklistSerializer
 from .analyzer import extract_features, _load_thresholds
 from .tasks import process_url_scan
 
@@ -309,7 +309,7 @@ def _scan_single_url(request, raw_url, use_live_signals=True):
     )
 
     payload = URLSerializer(url_obj).data
-    payload["scan_result"] = URLSerializer(url_obj).data.get("scan_result")
+    payload["scan_result"] = ScanResultSerializer(scan_result).data
     payload["input_url"] = raw_url
     payload["normalized_url"] = url_clean
     payload["risk_score"] = scan_result.risk_score
@@ -459,9 +459,9 @@ class ScanView(APIView):
                 return Response({"error": payload["error"]}, status=status.HTTP_400_BAD_REQUEST)
             return Response(payload, status=status.HTTP_200_OK)
 
-        except Exception:
+        except Exception as e:
             traceback.print_exc()
-            return Response({"error": "Scan failed due to a server error"}, status=500)
+            return Response({"error": f"Scan failed: {str(e)}"}, status=500)
 
 
 class BulkScanView(APIView):

@@ -2,7 +2,9 @@
 import api from "./axiosInstance";
 
 function isGuestSession() {
-  return typeof sessionStorage !== "undefined" && sessionStorage.getItem("pg_is_guest") === "true";
+  const hasToken = typeof localStorage !== "undefined" && Boolean(localStorage.getItem("pg_access"));
+  const isExplicitGuest = typeof sessionStorage !== "undefined" && sessionStorage.getItem("pg_is_guest") === "true";
+  return !hasToken || isExplicitGuest;
 }
 
 function getGuestHistory() {
@@ -19,67 +21,90 @@ function saveGuestHistory(list) {
   } catch {}
 }
 
-// ── GET /api/history/ ─────────────────────────────────────────────────────────
-export async function fetchHistory({ status, search, sort, page = 1, page_size = 10 } = {}) {
-  if (isGuestSession()) {
-    let items = getGuestHistory();
-    if (status && status !== "all") {
-      items = items.filter((x) => (x.status || x.scan_result?.verdict) === status);
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      items = items.filter((x) => (x.url || "").toLowerCase().includes(q));
-    }
-    if (sort === "oldest") {
-      items.sort((a, b) => new Date(a.date_submitted) - new Date(b.date_submitted));
-    } else {
-      items.sort((a, b) => new Date(b.date_submitted) - new Date(a.date_submitted));
-    }
-
-    const start = (page - 1) * page_size;
-    const paginated = items.slice(start, start + page_size);
-
-    return {
-      results: paginated,
-      total: items.length,
-      page,
-      page_size,
-      total_pages: Math.ceil(items.length / page_size) || 1,
-    };
+function computeGuestHistory({ status, search, sort, page = 1, page_size = 10 } = {}) {
+  let items = getGuestHistory();
+  if (status && status !== "all") {
+    items = items.filter((x) => (x.status || x.scan_result?.verdict) === status);
+  }
+  if (search) {
+    const q = search.toLowerCase();
+    items = items.filter((x) => (x.url || "").toLowerCase().includes(q));
+  }
+  if (sort === "oldest") {
+    items.sort((a, b) => new Date(a.date_submitted) - new Date(b.date_submitted));
+  } else {
+    items.sort((a, b) => new Date(b.date_submitted) - new Date(a.date_submitted));
   }
 
-  const params = new URLSearchParams();
-  if (status && status !== "all") params.append("status", status);
-  if (search) params.append("search", search);
-  if (sort) params.append("sort", sort);
-  if (page) params.append("page", page);
-  if (page_size) params.append("page_size", page_size);
-  const { data } = await api.get(`/history/?${params.toString()}`);
-  return data;
+  const start = (page - 1) * page_size;
+  const paginated = items.slice(start, start + page_size);
+
+  return {
+    results: paginated,
+    total: items.length,
+    page,
+    page_size,
+    total_pages: Math.ceil(items.length / page_size) || 1,
+  };
+}
+
+function computeGuestStats() {
+  const items = getGuestHistory();
+  const total = items.length;
+  const phishing = items.filter((x) => (x.status || x.scan_result?.verdict) === "phishing").length;
+  const suspicious = items.filter((x) => (x.status || x.scan_result?.verdict) === "suspicious").length;
+  const safe = items.filter((x) => (x.status || x.scan_result?.verdict) === "safe").length;
+  const threatCount = phishing + suspicious;
+
+  return {
+    total,
+    phishing,
+    suspicious,
+    safe,
+    threat_count: threatCount,
+    threat_rate: Math.round((threatCount / Math.max(total, 1)) * 100),
+  };
+}
+
+// ── GET /api/history/ ─────────────────────────────────────────────────────────
+export async function fetchHistory(options = {}) {
+  if (isGuestSession()) {
+    return computeGuestHistory(options);
+  }
+
+  try {
+    const { status, search, sort, page = 1, page_size = 10 } = options;
+    const params = new URLSearchParams();
+    if (status && status !== "all") params.append("status", status);
+    if (search) params.append("search", search);
+    if (sort) params.append("sort", sort);
+    if (page) params.append("page", page);
+    if (page_size) params.append("page_size", page_size);
+    const { data } = await api.get(`/history/?${params.toString()}`);
+    return data;
+  } catch (err) {
+    if (err.response?.status === 401) {
+      return computeGuestHistory(options);
+    }
+    throw err;
+  }
 }
 
 // ── GET /api/stats/ ───────────────────────────────────────────────────────────
 export async function fetchStats() {
   if (isGuestSession()) {
-    const items = getGuestHistory();
-    const total = items.length;
-    const phishing = items.filter((x) => (x.status || x.scan_result?.verdict) === "phishing").length;
-    const suspicious = items.filter((x) => (x.status || x.scan_result?.verdict) === "suspicious").length;
-    const safe = items.filter((x) => (x.status || x.scan_result?.verdict) === "safe").length;
-    const threatCount = phishing + suspicious;
-
-    return {
-      total,
-      phishing,
-      suspicious,
-      safe,
-      threat_count: threatCount,
-      threat_rate: Math.round((threatCount / Math.max(total, 1)) * 100),
-    };
+    return computeGuestStats();
   }
 
-  const { data } = await api.get("/stats/");
-  return data;
+  try {
+    const { data } = await api.get("/stats/");
+    return data;
+  } catch (err) {
+    if (err.response?.status === 401) {
+      return computeGuestStats();
+    }
+    throw err;
+  }
 }
 
 // ── GET /api/analytics/ ───────────────────────────────────────────────────────
@@ -114,8 +139,15 @@ export async function fetchAnalytics() {
     };
   }
 
-  const { data } = await api.get("/analytics/");
-  return data;
+  try {
+    const { data } = await api.get("/analytics/");
+    return data;
+  } catch (err) {
+    if (err.response?.status === 401) {
+      return fetchAnalytics(); // fallback to guest calculation
+    }
+    throw err;
+  }
 }
 
 // ── POST /api/scan/ ───────────────────────────────────────────────────────────

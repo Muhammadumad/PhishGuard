@@ -7,7 +7,7 @@ class ScanResultSerializer(serializers.ModelSerializer):
     class Meta:
         model  = ScanResult
         fields = [
-            "id", "url_id",
+            "id", "url",
             # 17 features
             "url_length", "domain_length", "path_length",
             "num_dots", "num_hyphens", "num_subdomains", "num_query_params",
