@@ -452,35 +452,12 @@ class ScanView(APIView):
 
     def post(self, request):
         try:
-            # Enqueue the scan and return quickly. Worker will update ScanResult and URL.status.
             use_live_signals = _as_bool(request.data.get("use_live_signals"), ENABLE_LIVE_SIGNALS)
             raw_url = request.data.get("url")
-            raw_url, url_clean, error = _normalize_scan_input(raw_url)
-            if error:
-                return Response({"error": error}, status=400)
-
-            user = request.user if (hasattr(request, "user") and request.user and request.user.is_authenticated) else None
-
-            # create queued URL row
-            url_obj = URL.objects.create(
-                url=raw_url,
-                submitted_by=user,
-                status="queued",
-            )
-
-            # enqueue background job
-            try:
-                process_url_scan.delay(url_obj.id, use_live_signals)
-            except Exception:
-                # if enqueue fails, leave as pending so it can be retried manually
-                url_obj.status = "pending"
-                url_obj.save(update_fields=["status"]) 
-
-            payload = URLSerializer(url_obj).data
-            payload["input_url"] = raw_url
-            payload["normalized_url"] = url_clean
-            payload["status"] = url_obj.status
-            return Response(payload, status=202)
+            payload = _scan_single_url(request, raw_url, use_live_signals=use_live_signals)
+            if "error" in payload and payload["error"]:
+                return Response({"error": payload["error"]}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(payload, status=status.HTTP_200_OK)
 
         except Exception:
             traceback.print_exc()
