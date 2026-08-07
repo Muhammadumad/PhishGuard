@@ -181,10 +181,12 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.AllowAny",
     ),
+    # JSON only — no BrowsableAPIRenderer so browsers always get JSON, not HTML
     "DEFAULT_RENDERER_CLASSES": (
         "rest_framework.renderers.JSONRenderer",
-        "rest_framework.renderers.BrowsableAPIRenderer",
     ),
+    # Custom handler ensures 500s always return JSON, not Django HTML pages
+    "EXCEPTION_HANDLER": "core.exception_handler.custom_exception_handler",
     # Rate Limiting (Throttling)
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",

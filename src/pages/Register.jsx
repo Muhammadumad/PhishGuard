@@ -192,11 +192,13 @@ export default function Register() {
           );
         else if (data?.error) setApiError(data.error);
         else if (data?.detail) setApiError(data.detail);
-        else if (typeof data === "object")
+        else if (typeof data === "object" && data !== null)
           setApiError("Error " + status + ": " + JSON.stringify(data));
+        else if (typeof data === "string" && data.length < 500)
+          setApiError("Server error " + status + ": " + data);
         else
           setApiError(
-            "Error " + status + " — check Django terminal for details.",
+            "Server returned HTTP " + status + " (non-JSON). Check Render logs for the full traceback.",
           );
       }
     } finally {
