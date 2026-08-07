@@ -166,7 +166,9 @@ urlpatterns = [
     
     # Authentication
     path("api/token/",         LoginView.as_view(),       name="token_obtain"),
+    path("api/token",          LoginView.as_view()),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/refresh",  TokenRefreshView.as_view()),
     
     # API Documentation (drf-spectacular)
     path("api/schema/",        SpectacularAPIView.as_view(),        name="schema"),

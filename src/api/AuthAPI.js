@@ -1,7 +1,8 @@
 // src/api/authAPI.js — COMPLETE FILE
 import axios from "axios";
 
-const BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+const rawBase = import.meta.env.VITE_API_BASE_URL || "/api";
+const BASE = rawBase.replace(/\/+$/, "");
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 export async function loginUser({ email, password }) {
