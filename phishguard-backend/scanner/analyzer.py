@@ -482,11 +482,32 @@ EXACT_ONLY_TRUSTED_DOMAINS = {
 }
 
 
+TYPO_PREFIXES = {
+    "wwt", "waw", "wvw", "ww1", "ww2", "ww3", "www1", "www2",
+    "w-w-w", "wvw", "vvw", "vww", "wwe", "wws", "wwa", "wwq",
+    "w-w", "w--w", "ww-", "w_w", "ww_", "w-w-w-w"
+}
+
+
 def _is_trusted_domain_match(domain: str, trusted: str) -> bool:
-    """Match trusted domains with stricter rules for multi-tenant roots."""
+    """Match trusted domains with strict rules for subdomains and typo prefixes."""
     if trusted in EXACT_ONLY_TRUSTED_DOMAINS:
         return domain == trusted
-    return _is_same_or_subdomain(domain, trusted)
+    if not _is_same_or_subdomain(domain, trusted):
+        return False
+
+    # If it's a subdomain (not exact root match), check if subdomain label has typo prefixes or phishing keywords
+    if domain != trusted and domain != f"www.{trusted}":
+        parts = domain.split(".")
+        subdomain_label = parts[0] if parts else ""
+        if subdomain_label in TYPO_PREFIXES:
+            return False
+        # If subdomain contains critical threat keywords, do not auto-trust blindly
+        sub_tokens = _tokenize(subdomain_label)
+        if any(kw in sub_tokens for kw in {"login", "verify", "secure", "account", "password", "update", "signin", "auth", "pay", "bank"}):
+            return False
+
+    return True
 
 
 def _looks_like_trusted_impersonation(domain: str, trusted: str) -> bool:
@@ -603,9 +624,10 @@ def extract_features(url: str) -> dict:
     for label in parts[:-1]:
         if len(label) >= 8 and _shannon_entropy(label) > 4.15:
             high_entropy_labels.append(label)
-    if high_entropy_labels:
-        points += 12
-        reasons.append(f"High character randomness in domain label (potential DGA/obfuscated host)")
+    # ── Typo subdomain prefix check (wwt, ww1, wvw, etc.) (+35 pts) ───────────
+    if parts and (parts[0] in TYPO_PREFIXES or any(p in TYPO_PREFIXES for p in parts[:-1])):
+        points += 35
+        reasons.append("Typo subdomain prefix ('wwt' / 'ww1') — typosquatting / phishing trick")
 
     # ── Punycode homograph (+30) ──────────────────────────────────────────────
     if feats["has_punycode"]:
