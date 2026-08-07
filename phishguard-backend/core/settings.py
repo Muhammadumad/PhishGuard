@@ -181,10 +181,11 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
+        "rest_framework.permissions.AllowAny",
     ),
     "DEFAULT_RENDERER_CLASSES": (
         "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
     ),
     # Rate Limiting (Throttling)
     "DEFAULT_THROTTLE_CLASSES": [
@@ -193,10 +194,10 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon":  "20/hour",    # Anonymous: 20 requests per hour
-        "user":  "100/hour",   # Authenticated: 100 requests per hour
-        "login": os.getenv("DRF_THROTTLE_LOGIN", "10/hour"),
-        "register": os.getenv("DRF_THROTTLE_REGISTER", "5/hour"),
+        "anon":     os.getenv("DRF_THROTTLE_ANON", "500/hour"),
+        "user":     os.getenv("DRF_THROTTLE_USER", "2000/hour"),
+        "login":    os.getenv("DRF_THROTTLE_LOGIN", "100/hour"),
+        "register": os.getenv("DRF_THROTTLE_REGISTER", "50/hour"),
     },
     # API Documentation
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
