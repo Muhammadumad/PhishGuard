@@ -12,6 +12,10 @@ BASE_DIR   = Path(__file__).resolve().parent.parent
 DEBUG      = os.getenv("DEBUG", "False") == "True"
 SECRET_KEY = os.getenv("SECRET_KEY", "django-prod-secret-key-phishguard-2026-safe-default-key")
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
+# Always allow Render and common production hosts
+for _h in ("phishguard-api-g2df.onrender.com", ".onrender.com", ".vercel.app", "localhost", "127.0.0.1"):
+    if _h not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_h)
 
 if DEBUG:
     # Keep local development flexible so browser, proxy, and test-client host headers do not
