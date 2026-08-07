@@ -29,91 +29,59 @@ class SecurityEventSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+def _safe_log(event_type, **kwargs):
+    """Log a security event — silently swallow all errors so logging never breaks the API."""
+    try:
+        SecurityEvent.objects.create(event_type=event_type, **kwargs)
+    except Exception:
+        pass
+
+
 # ── Register ──────────────────────────────────────────────────────────────────
 class RegisterView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = "register"
 
     def post(self, request):
-        ip = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip() or request.META.get("REMOTE_ADDR")
-        try:
-            email    = (request.data.get("email")    or "").strip()
-            username = (request.data.get("username") or email).strip()
-            password = (request.data.get("password") or "")
+        ip = (request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[0].strip()
+              or request.META.get("REMOTE_ADDR", "unknown"))
+        email    = (request.data.get("email")    or "").strip()
+        username = (request.data.get("username") or email).strip()
+        password = (request.data.get("password") or "")
 
+        try:
             if not email:
-                SecurityEvent.objects.create(
-                    event_type="register_failed",
-                    email=email,
-                    username=username,
-                    ip_address=ip,
-                    success=False,
-                    details={"reason": "missing_email"},
-                )
                 return Response({"error": "Email is required"}, status=400)
             if not password:
-                SecurityEvent.objects.create(
-                    event_type="register_failed",
-                    email=email,
-                    username=username,
-                    ip_address=ip,
-                    success=False,
-                    details={"reason": "missing_password"},
-                )
                 return Response({"error": "Password is required"}, status=400)
             if len(password) < 8:
-                SecurityEvent.objects.create(
-                    event_type="register_failed",
-                    email=email,
-                    username=username,
-                    ip_address=ip,
-                    success=False,
-                    details={"reason": "weak_password_length"},
-                )
                 return Response({"error": "Password must be at least 8 characters"}, status=400)
+
             try:
                 validate_password(password)
             except ValidationError as err:
-                SecurityEvent.objects.create(
-                    event_type="register_failed",
-                    email=email,
-                    username=username,
-                    ip_address=ip,
-                    success=False,
-                    details={"reason": "password_validator", "messages": err.messages},
-                )
                 return Response({"error": " ".join(err.messages)}, status=400)
+
             if User.objects.filter(email=email).exists():
-                SecurityEvent.objects.create(
-                    event_type="register_failed",
-                    email=email,
-                    username=username,
-                    ip_address=ip,
-                    success=False,
-                    details={"reason": "email_exists"},
-                )
                 return Response({"error": "This email is already registered"}, status=400)
-            if username and User.objects.filter(username=username).exists():
-                base_username = username
-                suffix = 2
-                while User.objects.filter(username=username).exists():
-                    username = f"{base_username}{suffix}"
-                    suffix += 1
+
+            # Ensure username is unique
+            base_username = username or email
+            candidate = base_username
+            suffix = 2
+            while User.objects.filter(username=candidate).exists():
+                candidate = f"{base_username}{suffix}"
+                suffix += 1
+            username = candidate
 
             user = User.objects.create_user(
-                email    = email,
-                username = username or email,
-                password = password,
+                email=email,
+                username=username,
+                password=password,
             )
 
-            SecurityEvent.objects.create(
-                event_type="register_success",
-                email=user.email,
-                username=user.username,
-                ip_address=ip,
-                user=user,
-                success=True,
-            )
+            _safe_log("register_success", email=user.email, username=user.username,
+                      ip_address=ip, user=user, success=True)
 
             return Response({
                 "id":       user.id,
@@ -124,16 +92,10 @@ class RegisterView(APIView):
 
         except Exception as e:
             traceback.print_exc()
-            logger.exception("Registration failed")
-            SecurityEvent.objects.create(
-                event_type="register_failed",
-                email=email if "email" in locals() else "",
-                username=username if "username" in locals() else "",
-                ip_address=ip,
-                success=False,
-                details={"reason": "server_error"},
-            )
-            return Response({"error": "Registration failed due to a server error"}, status=500)
+            logger.exception("Registration failed: %s", e)
+            _safe_log("register_failed", email=email, username=username,
+                      ip_address=ip, success=False, details={"reason": "server_error", "error": str(e)})
+            return Response({"error": f"Registration failed: {str(e)}"}, status=500)
 
 
 # ── Profile ───────────────────────────────────────────────────────────────────
