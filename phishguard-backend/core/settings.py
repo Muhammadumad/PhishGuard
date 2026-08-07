@@ -109,8 +109,12 @@ else:
 # Sessions stored in MySQL db (django_session table)
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
-# ── Cache — use Redis if REDIS_URL is set, otherwise fall back to local memory ─
-_REDIS_URL = os.getenv("REDIS_URL", "")
+# ── Cache — use Redis if REDIS_URL is valid, otherwise fall back to local memory ─
+_raw_redis = (os.getenv("REDIS_URL") or "").strip()
+if _raw_redis and _raw_redis.startswith(("redis://", "rediss://", "unix://")):
+    _REDIS_URL = _raw_redis
+else:
+    _REDIS_URL = None
 
 if _REDIS_URL:
     CACHES = {
@@ -126,7 +130,7 @@ if _REDIS_URL:
         }
     }
 else:
-    # No Redis configured — use in-process memory cache (safe fallback)
+    # No valid Redis URL configured — use in-process memory cache (safe fallback)
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -136,8 +140,8 @@ else:
     }
 
 # ── Celery Configuration (Task Queue & Async Processing) ──────────────────────
-CELERY_BROKER_URL = _REDIS_URL or "memory://"
-CELERY_RESULT_BACKEND = _REDIS_URL or "cache+memory://"
+CELERY_BROKER_URL = _REDIS_URL if _REDIS_URL else "memory://"
+CELERY_RESULT_BACKEND = _REDIS_URL if _REDIS_URL else "cache+memory://"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
