@@ -3,12 +3,14 @@ import multiprocessing
 import os
 
 # Server Socket
-bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8000")
+port = os.getenv("PORT", "8000")
+bind = os.getenv("GUNICORN_BIND", f"0.0.0.0:{port}")
 backlog = 2048
 
 # Worker Processes
-# Standard rule: (2 x cores) + 1
-workers = int(os.getenv("GUNICORN_WORKERS", multiprocessing.cpu_count() * 2 + 1))
+# Standard rule: (2 x cores) + 1, capped at 2 for free tier memory limits (512MB RAM)
+cpu_workers = (multiprocessing.cpu_count() * 2 + 1)
+workers = int(os.getenv("GUNICORN_WORKERS", min(cpu_workers, 2)))
 worker_class = "gthread"
 threads = int(os.getenv("GUNICORN_THREADS", 2))
 worker_connections = 1000
@@ -17,7 +19,7 @@ worker_connections = 1000
 proc_name = "phishguard_backend"
 
 # Timeout & Keepalive
-timeout = int(os.getenv("GUNICORN_TIMEOUT", 60))
+timeout = int(os.getenv("GUNICORN_TIMEOUT", 120))
 graceful_timeout = 30
 keepalive = 5
 
@@ -36,5 +38,5 @@ limit_request_line = 4094
 limit_request_fields = 100
 limit_request_field_size = 8190
 
-# Preload application code for lower memory usage across workers
-preload_app = True
+# Preload application code (False on free tier to avoid DB initialization errors at boot)
+preload_app = os.getenv("PRELOAD_APP", "False") == "True"
