@@ -4,6 +4,7 @@ services:
     name: phishguard-backend
     env: python
     rootDir: phishguard-backend
+    healthCheckPath: /health/
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
     startCommand: "gunicorn core.wsgi:application --config gunicorn.conf.py"
     envVars:
@@ -14,16 +15,14 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_HOSTS
-        value: ".onrender.com"
-      - key: USE_REDIS_CACHE
-        value: "True"
+        value: ".onrender.com,localhost,127.0.0.1"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://phish-guard-git-main-umad-tech.vercel.app,https://phishguard033-g2im.vercel.app"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://phishguard-api-g2df.onrender.com"
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
-        sync: false
-      - key: CORS_ALLOWED_ORIGINS
-        sync: false
-      - key: CSRF_TRUSTED_ORIGINS
         sync: false
 
   # ── Celery Background Worker Service ─────────────────────────────────────────

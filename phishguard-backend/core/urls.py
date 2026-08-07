@@ -160,7 +160,16 @@ class LoginView(APIView):
         })
 
 
+from django.http import JsonResponse
+
+def health_check(request):
+    return JsonResponse({"status": "ok", "service": "phishguard-api"})
+
 urlpatterns = [
+    # Health check — no auth required
+    path("health/",            health_check),
+    path("api/health/",        health_check),
+
     # Django Admin
     path("admin/",             admin.site.urls),
     

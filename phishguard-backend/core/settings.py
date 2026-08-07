@@ -109,11 +109,24 @@ else:
 # Sessions stored in MySQL db (django_session table)
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
-# ── Cache — fast local cache in dev, Redis in production ─────────────────────
-# Why: when Redis is not running locally, each cache call can block for seconds.
-USE_REDIS_CACHE = os.getenv("USE_REDIS_CACHE", "False") == "True"
+# ── Cache — use Redis if REDIS_URL is set, otherwise fall back to local memory ─
+_REDIS_URL = os.getenv("REDIS_URL", "")
 
-if DEBUG and not USE_REDIS_CACHE:
+if _REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND":  "django_redis.cache.RedisCache",
+            "LOCATION": _REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "SOCKET_CONNECT_TIMEOUT": 1,
+                "SOCKET_TIMEOUT": 1,
+                "IGNORE_EXCEPTIONS": True,  # Never crash if Redis is down
+            }
+        }
+    }
+else:
+    # No Redis configured — use in-process memory cache (safe fallback)
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -121,25 +134,10 @@ if DEBUG and not USE_REDIS_CACHE:
             "TIMEOUT": 300,
         }
     }
-else:
-    CACHES = {
-        "default": {
-            "BACKEND":  "django_redis.cache.RedisCache",
-            "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0"),
-            "OPTIONS": {
-                "CLIENT_CLASS": "django_redis.client.DefaultClient",
-                # Keep Redis failure fast to avoid API latency spikes.
-                "SOCKET_CONNECT_TIMEOUT": float(os.getenv("REDIS_CONNECT_TIMEOUT", "0.2")),
-                "SOCKET_TIMEOUT": float(os.getenv("REDIS_SOCKET_TIMEOUT", "0.2")),
-                "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
-                "IGNORE_EXCEPTIONS": True,
-            }
-        }
-    }
 
 # ── Celery Configuration (Task Queue & Async Processing) ──────────────────────
-CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+CELERY_BROKER_URL = _REDIS_URL or "memory://"
+CELERY_RESULT_BACKEND = _REDIS_URL or "cache+memory://"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
