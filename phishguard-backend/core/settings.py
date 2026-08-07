@@ -67,24 +67,40 @@ TEMPLATES = [{
 # ── Custom User Model ─────────────────────────────────────────────────────────
 AUTH_USER_MODEL = "accounts.User"
 
-# ── DATABASE — MySQL ONLY (SQLite completely removed) ─────────────────────────
-DATABASES = {
-    "default": {
-        "ENGINE":   "django.db.backends.mysql",
-        "NAME":     os.getenv("DB_NAME",     "phishguard_db"),
-        "USER":     os.getenv("DB_USER",     "phishguard_user"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST":     os.getenv("DB_HOST",     "127.0.0.1"),
-        "PORT":     os.getenv("DB_PORT",     "3306"),
-        "OPTIONS": {
-            # Fail fast when MySQL is unavailable instead of making page loads hang.
+import dj_database_url
+
+# ── DATABASE ──────────────────────────────────────────────────────────────────
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=60,
+            ssl_require=True if ("sslmode=require" in DATABASE_URL or not DEBUG) else False,
+        )
+    }
+else:
+    db_engine = os.getenv("DB_ENGINE", "django.db.backends.mysql")
+    db_options = {}
+    if "mysql" in db_engine:
+        db_options = {
             "connect_timeout": float(os.getenv("DB_CONNECT_TIMEOUT", "3")),
             "charset":      "utf8mb4",
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
-        "CONN_MAX_AGE": 60,
+        }
+    DATABASES = {
+        "default": {
+            "ENGINE":   db_engine,
+            "NAME":     os.getenv("DB_NAME",     "phishguard_db"),
+            "USER":     os.getenv("DB_USER",     "phishguard_user"),
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
+            "HOST":     os.getenv("DB_HOST",     "127.0.0.1"),
+            "PORT":     os.getenv("DB_PORT",     "3306"),
+            "OPTIONS":  db_options,
+            "CONN_MAX_AGE": 60,
+        }
     }
-}
 
 # Sessions stored in MySQL db (django_session table)
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
