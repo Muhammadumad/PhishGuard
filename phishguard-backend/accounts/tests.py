@@ -103,3 +103,89 @@ class AuditLogAPITests(TestCase):
         cef_res = self.client.get(f"{url}?format=cef")
         self.assertEqual(cef_res.status_code, status.HTTP_200_OK)
         self.assertIn("CEF:0|PhishGuard|AuditEngine", cef_res.content.decode())
+
+
+class ErrorMonitoringAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="normaluser",
+            email="user@example.com",
+            password="Password123!",
+            role="user",
+        )
+        self.admin = User.objects.create_user(
+            username="adminuser",
+            email="admin@example.com",
+            password="AdminPassword123!",
+            role="admin",
+        )
+
+    def test_capture_exception_helper(self):
+        from accounts.error_monitoring import capture_exception
+        from accounts.models import ErrorLog
+
+        try:
+            raise ValueError("Test Error Monitoring Exception")
+        except ValueError as exc:
+            entry = capture_exception(exc, severity="critical", status_code=500)
+            self.assertIsNotNone(entry)
+            self.assertEqual(entry.exception_class, "ValueError")
+            self.assertEqual(entry.message, "Test Error Monitoring Exception")
+            self.assertEqual(entry.severity, "critical")
+            self.assertFalse(entry.is_resolved)
+
+    def test_error_log_list_permission_and_filtering(self):
+        from django.urls import reverse
+        from accounts.error_monitoring import capture_exception
+        
+        # Capture a test error
+        try:
+            raise KeyError("Missing Key Error")
+        except KeyError as exc:
+            capture_exception(exc, severity="error", status_code=500)
+
+        url = reverse("error_logs")
+
+        # 1. Anonymous user blocked
+        res_anon = self.client.get(url)
+        self.assertIn(res_anon.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
+
+        # 2. Normal user blocked (403)
+        self.client.force_authenticate(user=self.user)
+        res_user = self.client.get(url)
+        self.assertEqual(res_user.status_code, status.HTTP_403_FORBIDDEN)
+
+        # 3. Admin allowed (200)
+        self.client.force_authenticate(user=self.admin)
+        res_admin = self.client.get(url)
+        self.assertEqual(res_admin.status_code, status.HTTP_200_OK)
+        data = res_admin.json()
+        self.assertGreaterEqual(data["count"], 1)
+
+    def test_error_log_stats_and_resolve(self):
+        from django.urls import reverse
+        from accounts.error_monitoring import capture_exception
+        from accounts.models import ErrorLog
+
+        try:
+            raise RuntimeError("Database Connection Timeout")
+        except RuntimeError as exc:
+            log_entry = capture_exception(exc, severity="critical", status_code=500)
+
+        self.client.force_authenticate(user=self.admin)
+
+        # Test stats
+        stats_res = self.client.get(reverse("error_log_stats"))
+        self.assertEqual(stats_res.status_code, status.HTTP_200_OK)
+        stats_data = stats_res.json()
+        self.assertIn("total_errors", stats_data)
+        self.assertIn("unresolved_errors", stats_data)
+
+        # Test resolve
+        resolve_url = reverse("error_log_resolve", kwargs={"pk": log_entry.pk})
+        resolve_res = self.client.patch(resolve_url, {"resolution_notes": "Fixed in patch release"}, format="json")
+        self.assertEqual(resolve_res.status_code, status.HTTP_200_OK)
+        resolved_data = resolve_res.json()
+        self.assertTrue(resolved_data["is_resolved"])
+        self.assertEqual(resolved_data["resolution_notes"], "Fixed in patch release")

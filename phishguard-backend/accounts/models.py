@@ -187,4 +187,61 @@ class APIKey(models.Model):
         ]
 
     def __str__(self):
-        return f"APIKey '{self.name}' ({self.key_prefix}...)"
+        return f"APIKey '{self.name}' ({self.key_prefix}...)"
+
+
+class ErrorLog(models.Model):
+    """
+    Enterprise Error Log model for PhishGuard.
+    Captures unhandled exceptions, 500 server crashes, and API failures.
+    """
+    SEVERITY_CHOICES = [
+        ("warning", "Warning"),
+        ("error", "Error"),
+        ("critical", "Critical"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    exception_class = models.CharField(max_length=150, db_index=True)
+    message = models.TextField()
+    traceback = models.TextField()
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default="error", db_index=True)
+    status_code = models.IntegerField(default=500, db_index=True)
+    request_path = models.CharField(max_length=255, db_index=True)
+    request_method = models.CharField(max_length=10, default="GET")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="error_logs",
+    )
+    user_email = models.CharField(max_length=150, blank=True, default="")
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_index=True)
+    user_agent = models.TextField(blank=True, default="")
+    extra_data = models.JSONField(default=dict, blank=True)
+    is_resolved = models.BooleanField(default=False, db_index=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resolved_error_logs",
+    )
+    resolution_notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "error_logs"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["severity", "created_at"], name="idx_err_sev_date"),
+            models.Index(fields=["exception_class", "created_at"], name="idx_err_cls_date"),
+            models.Index(fields=["is_resolved", "created_at"], name="idx_err_res_date"),
+            models.Index(fields=["status_code", "created_at"], name="idx_err_st_date"),
+        ]
+
+    def __str__(self):
+        status_str = "RESOLVED" if self.is_resolved else "UNRESOLVED"
+        return f"[{self.severity.upper()} - {status_str}] {self.exception_class}: {self.message[:50]} @ {self.created_at:%Y-%m-%d %H:%M:%S}"

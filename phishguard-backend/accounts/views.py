@@ -14,7 +14,7 @@ import io
 import datetime
 from django.db.models import Count, Q
 from django.utils import timezone
-from .models import SecurityEvent, AuditLog
+from .models import SecurityEvent, AuditLog, ErrorLog
 from .audit_logger import log_audit_event
 
 logger = logging.getLogger("accounts")
@@ -50,6 +50,28 @@ class AuditLogSerializer(serializers.ModelSerializer):
 
     def get_user_email_display(self, obj):
         return obj.user_email or (obj.user.email if obj.user else "Anonymous")
+
+
+class ErrorLogSerializer(serializers.ModelSerializer):
+    user_email_display = serializers.SerializerMethodField()
+    resolved_by_email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ErrorLog
+        fields = [
+            "id", "exception_class", "message", "traceback", "severity",
+            "status_code", "request_path", "request_method", "user",
+            "user_email", "user_email_display", "ip_address", "user_agent",
+            "extra_data", "is_resolved", "resolved_by", "resolved_by_email",
+            "resolution_notes", "created_at", "resolved_at",
+        ]
+        read_only_fields = fields
+
+    def get_user_email_display(self, obj):
+        return obj.user_email or (obj.user.email if obj.user else "Anonymous")
+
+    def get_resolved_by_email(self, obj):
+        return obj.resolved_by.email if obj.resolved_by else ""
 
 
 def _safe_log(event_type, request=None, **kwargs):
@@ -364,3 +386,145 @@ class AuditLogExportView(APIView):
             "format": "json",
             "audit_logs": serializer.data,
         })
+
+
+class ErrorLogListView(APIView):
+    """
+    GET /api/accounts/error-logs/ (Admin only)
+    Query parameters:
+    - severity, exception_class, status_code, is_resolved, ip_address
+    - search (matches message, traceback, request_path, exception_class)
+    - start_date, end_date (ISO 8601 YYYY-MM-DD)
+    - page, page_size
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        if not request.user or not (getattr(request.user, "role", "") == "admin" or getattr(request.user, "is_superuser", False)):
+            return Response({"error": "Admin permission required"}, status=403)
+
+        qs = ErrorLog.objects.select_related("user", "resolved_by").all()
+
+        params = getattr(request, "query_params", request.GET)
+        severity = params.get("severity")
+        exception_class = params.get("exception_class")
+        status_code = params.get("status_code")
+        is_resolved = params.get("is_resolved")
+        ip_address = params.get("ip_address")
+        search = params.get("search")
+        start_date = params.get("start_date")
+        end_date = params.get("end_date")
+
+        if severity:
+            qs = qs.filter(severity=severity)
+        if exception_class:
+            qs = qs.filter(exception_class=exception_class)
+        if status_code:
+            qs = qs.filter(status_code=status_code)
+        if is_resolved is not None:
+            if is_resolved.lower() in ["true", "1"]:
+                qs = qs.filter(is_resolved=True)
+            elif is_resolved.lower() in ["false", "0"]:
+                qs = qs.filter(is_resolved=False)
+        if ip_address:
+            qs = qs.filter(ip_address=ip_address)
+
+        if search:
+            qs = qs.filter(
+                Q(message__icontains=search) |
+                Q(exception_class__icontains=search) |
+                Q(request_path__icontains=search) |
+                Q(traceback__icontains=search)
+            )
+
+        if start_date:
+            qs = qs.filter(created_at__gte=start_date)
+        if end_date:
+            qs = qs.filter(created_at__lte=end_date)
+
+        try:
+            page = max(1, int(params.get("page", 1)))
+            page_size = min(100, max(1, int(params.get("page_size", 25))))
+        except ValueError:
+            page, page_size = 1, 25
+
+        total_count = qs.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        serializer = ErrorLogSerializer(qs[start:end], many=True)
+        return Response({
+            "count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total_count + page_size - 1) // page_size if page_size else 1,
+            "unresolved_count": ErrorLog.objects.filter(is_resolved=False).count(),
+            "results": serializer.data,
+        })
+
+
+class ErrorLogStatsView(APIView):
+    """
+    GET /api/accounts/error-logs/stats/ (Admin only)
+    Returns analytics breakdown of errors by severity, status code, exception type, and failing paths.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, format=None):
+        if not request.user or not (getattr(request.user, "role", "") == "admin" or getattr(request.user, "is_superuser", False)):
+            return Response({"error": "Admin permission required"}, status=403)
+
+        total_errors = ErrorLog.objects.count()
+        unresolved_errors = ErrorLog.objects.filter(is_resolved=False).count()
+
+        severity_counts = list(ErrorLog.objects.values("severity").annotate(count=Count("id")).order_by("-count"))
+        status_code_counts = list(ErrorLog.objects.values("status_code").annotate(count=Count("id")).order_by("-count"))
+        top_exceptions = list(ErrorLog.objects.values("exception_class").annotate(count=Count("id")).order_by("-count")[:5])
+        top_failing_paths = list(ErrorLog.objects.exclude(request_path="").values("request_path").annotate(count=Count("id")).order_by("-count")[:5])
+
+        return Response({
+            "total_errors": total_errors,
+            "unresolved_errors": unresolved_errors,
+            "severity_breakdown": severity_counts,
+            "status_code_breakdown": status_code_counts,
+            "top_exceptions": top_exceptions,
+            "top_failing_paths": top_failing_paths,
+        })
+
+
+class ErrorLogResolveView(APIView):
+    """
+    PATCH /api/accounts/error-logs/<id>/resolve/ (Admin only)
+    Marks an error log entry as resolved/acknowledged with resolution notes.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk, format=None):
+        if not request.user or not (getattr(request.user, "role", "") == "admin" or getattr(request.user, "is_superuser", False)):
+            return Response({"error": "Admin permission required"}, status=403)
+
+        try:
+            error_log = ErrorLog.objects.get(pk=pk)
+        except ErrorLog.DoesNotExist:
+            return Response({"error": "Error log entry not found"}, status=404)
+
+        notes = request.data.get("resolution_notes", "").strip()
+        error_log.is_resolved = True
+        error_log.resolved_by = request.user
+        error_log.resolved_at = timezone.now()
+        if notes:
+            error_log.resolution_notes = notes
+        error_log.save()
+
+        log_audit_event(
+            request=request,
+            category="system",
+            event_type="error_resolved",
+            severity="info",
+            status="success",
+            target=f"ErrorLog #{pk} ({error_log.exception_class})",
+            details={"resolution_notes": notes},
+            user=request.user,
+        )
+
+        return Response(ErrorLogSerializer(error_log).data)

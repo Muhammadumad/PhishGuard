@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 def custom_exception_handler(exc, context):
+    request = context.get("request") if context else None
+
     # First, try DRF's built-in handler (handles APIException, AuthenticationFailed, etc.)
     response = exception_handler(exc, context)
 
@@ -25,7 +27,9 @@ def custom_exception_handler(exc, context):
         return response
 
     # DRF did NOT handle it — this is an unexpected server error (Python exception)
-    # Log the full traceback so it shows in Render logs
+    from accounts.error_monitoring import capture_exception
+    capture_exception(exc, request=request, severity="critical", status_code=500)
+
     logger.exception("Unhandled exception in view: %s", exc)
     traceback.print_exc()
 

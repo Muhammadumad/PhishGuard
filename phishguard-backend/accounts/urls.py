@@ -16,4 +16,11 @@ urlpatterns = [
     path("audit-logs/export",  views.AuditLogExportView.as_view()),
     path("audit-logs/",        views.AuditLogListView.as_view(),  name="audit_logs"),
     path("audit-logs",         views.AuditLogListView.as_view()),
+    # Error Logs (Monitoring)
+    path("error-logs/stats/",  views.ErrorLogStatsView.as_view(), name="error_log_stats"),
+    path("error-logs/stats",   views.ErrorLogStatsView.as_view()),
+    path("error-logs/<int:pk>/resolve/", views.ErrorLogResolveView.as_view(), name="error_log_resolve"),
+    path("error-logs/<int:pk>/resolve",  views.ErrorLogResolveView.as_view()),
+    path("error-logs/",        views.ErrorLogListView.as_view(),  name="error_logs"),
+    path("error-logs",         views.ErrorLogListView.as_view()),
 ]
