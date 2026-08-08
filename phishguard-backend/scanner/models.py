@@ -98,13 +98,30 @@ class ScanResult(models.Model):
     reasons          = models.JSONField(default=list)   # ["reason1", "reason2"]
     scanned_at       = models.DateTimeField(auto_now_add=True)
 
+    # ── Rich URL Intelligence Fields ──────────────────────
+    http_status_code     = models.IntegerField(null=True, blank=True)
+    final_url            = models.TextField(null=True, blank=True)
+    redirect_chain       = models.JSONField(default=list, blank=True)
+    page_title           = models.CharField(max_length=500, blank=True, default="")
+    has_password_input   = models.BooleanField(default=False)
+    has_external_form    = models.BooleanField(default=False)
+    ssl_issuer           = models.CharField(max_length=255, blank=True, default="")
+    ssl_valid_days       = models.IntegerField(null=True, blank=True)
+    domain_age_days      = models.IntegerField(null=True, blank=True)
+    ip_address           = models.CharField(max_length=45, blank=True, default="")
+    geo_country          = models.CharField(max_length=100, blank=True, default="")
+    threat_intel_details = models.JSONField(default=dict, blank=True)
+    risk_breakdown       = models.JSONField(default=dict, blank=True)
+
     class Meta:
         db_table = "scan_results"
         indexes  = [
-            models.Index(fields=["verdict"],          name="idx_scan_verdict"),
-            models.Index(fields=["confidence_score"], name="idx_scan_confidence"),
-            models.Index(fields=["scanned_at"],       name="idx_scan_date"),
-            models.Index(fields=["risk_score"],       name="idx_scan_score"),
+            models.Index(fields=["verdict"],                   name="idx_scan_verdict"),
+            models.Index(fields=["confidence_score"],          name="idx_scan_confidence"),
+            models.Index(fields=["scanned_at"],                name="idx_scan_date"),
+            models.Index(fields=["risk_score"],                name="idx_scan_score"),
+            models.Index(fields=["verdict", "scanned_at"],     name="idx_scan_verdict_date"),
+            models.Index(fields=["risk_score", "verdict"],     name="idx_scan_score_verdict"),
         ]
 
     def __str__(self):

@@ -26,10 +26,14 @@ from rest_framework import status
 
 from .models import URL, ScanResult, BlacklistedDomain, CachedScan
 from .serializers import URLSerializer, ScanResultSerializer, BlacklistSerializer
-from .analyzer import extract_features, _load_thresholds
+from .analyzer import extract_features, _load_thresholds, calculate_category_risk_breakdown
 from .tasks import process_url_scan
 from .virustotal import check_virustotal
 from .safebrowsing import check_google_safe_browsing
+from .http_inspector import inspect_url_content
+from .security import SSRFShield
+from .api_client import ResilientAPIClient
+from accounts.audit_logger import log_audit_event
 
 BULK_SCAN_MAX_URLS = 100
 LIVE_SIGNAL_CACHE_TTL = 3600
@@ -116,109 +120,116 @@ def _compute_verdict(score):
 
 def enrich_with_live_network_signals(url_clean, features):
     """
-    Add optional DNS/TLS risk signals with fail-open behavior.
-    No penalties are applied if network checks are unavailable.
+    Add live DNS, TLS, HTTP content, VirusTotal, and Google Safe Browsing signals.
+    Performs SSRF validation prior to any network requests.
     """
     parsed = urlparse(url_clean)
     host = (parsed.hostname or "").strip().lower()
     if not host:
         return features
 
-    cache_key = f"live_signals:{host}:{parsed.scheme}"
-    try:
-        cached = cache.get(cache_key)
-    except Exception:
-        cached = None
-    if cached is not None:
-        updated = dict(features)
-        risk_delta = int(cached.get("risk_delta", 0))
-        updated["risk_score"] = min(100, int(updated.get("risk_score", 0)) + risk_delta)
-        updated["confidence_score"] = float(updated["risk_score"])
-        updated["reasons"] = list(updated.get("reasons", [])) + list(cached.get("reasons", []))
-        updated["verdict"] = _compute_verdict(updated["risk_score"])
-        return updated
-
+    updated = dict(features)
     reasons = []
     risk_delta = 0
+    threat_intel_details = {}
 
-    # DNS signal: if host resolves to private/loopback/link-local IPs.
-    try:
-        infos = socket.getaddrinfo(host, None)
-        ips = sorted({row[4][0] for row in infos if row and row[4]})
-        if ips:
-            private_hits = 0
-            for ip in ips:
-                try:
-                    ip_obj = ipaddress.ip_address(ip)
-                except ValueError:
-                    continue
-                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
-                    private_hits += 1
-            if private_hits:
-                risk_delta += 12
-                reasons.append("Domain resolves to private or non-public IP space")
-    except Exception:
-        pass
+    # SSRF Check & DNS Resolution
+    is_safe, ssrf_error, resolved_ips = SSRFShield.validate_hostname(host)
+    if not is_safe:
+        risk_delta += 15
+        reasons.append(f"SSRF Alert: {ssrf_error}")
+    elif resolved_ips:
+        updated["ip_address"] = resolved_ips[0]
 
-    # TLS signal: certificate quality/validity checks for HTTPS endpoints.
-    if parsed.scheme == "https":
+    # TLS Certificate Telemetry & Verification for HTTPS endpoints
+    ssl_issuer = ""
+    ssl_valid_days = None
+    if parsed.scheme == "https" and is_safe:
         try:
             context = ssl.create_default_context()
-            with socket.create_connection((host, 443), timeout=3) as sock:
+            with socket.create_connection((host, 443), timeout=2.5) as sock:
                 with context.wrap_socket(sock, server_hostname=host) as tls_sock:
                     cert = tls_sock.getpeercert()
 
-            not_before = _parse_cert_time(cert.get("notBefore"))
-            not_after = _parse_cert_time(cert.get("notAfter"))
-            now = datetime.datetime.now(datetime.timezone.utc)
+            if cert:
+                # Extract issuer
+                issuer_components = [dict(entry).get("organizationName") or dict(entry).get("commonName") for rdn in cert.get("issuer", ()) for entry in rdn]
+                ssl_issuer = ", ".join(filter(None, issuer_components)) or "Unknown Issuer"
 
-            if not_before and not_after:
-                cert_lifetime = (not_after - not_before).days
-                days_to_expiry = (not_after - now).days
-                if cert_lifetime <= 30:
-                    risk_delta += 8
-                    reasons.append("TLS certificate has very short validity window")
-                if days_to_expiry <= 7:
-                    risk_delta += 10
-                    reasons.append("TLS certificate is close to expiry")
+                not_before = _parse_cert_time(cert.get("notBefore"))
+                not_after = _parse_cert_time(cert.get("notAfter"))
+                now = datetime.datetime.now(datetime.timezone.utc)
+
+                if not_before and not_after:
+                    cert_lifetime = (not_after - not_before).days
+                    days_to_expiry = (not_after - now).days
+                    ssl_valid_days = max(0, days_to_expiry)
+
+                    if cert_lifetime <= 30:
+                        risk_delta += 8
+                        reasons.append("TLS certificate has very short validity window")
+                    if days_to_expiry <= 7:
+                        risk_delta += 10
+                        reasons.append("TLS certificate is close to expiry")
+
         except ssl.SSLCertVerificationError:
             risk_delta += 18
             reasons.append("TLS certificate verification failed")
+            ssl_issuer = "Invalid/Untrusted Certificate"
         except Exception:
             pass
 
-    # VirusTotal live intelligence check (if API key configured)
+    updated["ssl_issuer"] = ssl_issuer
+    updated["ssl_valid_days"] = ssl_valid_days
+
+    # Live HTTP Content Inspection
+    if is_safe:
+        content_res = inspect_url_content(url_clean)
+        if content_res.get("success"):
+            updated["http_status_code"] = content_res.get("http_status_code")
+            updated["final_url"] = content_res.get("final_url", url_clean)
+            updated["redirect_chain"] = content_res.get("redirect_chain", [])
+            updated["page_title"] = content_res.get("page_title", "")
+            updated["has_password_input"] = content_res.get("has_password_input", False)
+            updated["has_external_form"] = content_res.get("has_external_form", False)
+
+            if content_res.get("risk_boost", 0) > 0:
+                risk_delta += content_res["risk_boost"]
+                reasons.extend(content_res.get("reasons", []))
+
+    # VirusTotal live threat check
     try:
         vt_res = check_virustotal(url_clean)
+        threat_intel_details["virustotal"] = vt_res
         if vt_res.get("enabled") and vt_res.get("score_boost", 0) > 0:
             risk_delta += int(vt_res["score_boost"])
             reasons.extend(vt_res.get("reasons", []))
     except Exception:
         pass
 
-    # Google Safe Browsing v4 live threat check (if API key configured)
+    # Google Safe Browsing v4 threat check
     try:
         gsb_res = check_google_safe_browsing(url_clean)
+        threat_intel_details["safe_browsing"] = gsb_res
         if gsb_res.get("enabled") and gsb_res.get("score_boost", 0) > 0:
             risk_delta += int(gsb_res["score_boost"])
             reasons.extend(gsb_res.get("reasons", []))
     except Exception:
         pass
 
-    if risk_delta <= 0:
-        return features
+    updated["threat_intel_details"] = threat_intel_details
 
-    try:
-        cache.set(cache_key, {"risk_delta": risk_delta, "reasons": reasons}, timeout=LIVE_SIGNAL_CACHE_TTL)
-    except Exception:
-        pass
-
-    updated = dict(features)
     base_reasons = list(updated.get("reasons", []))
-    updated["risk_score"] = min(100, int(updated.get("risk_score", 0)) + risk_delta)
-    updated["confidence_score"] = float(updated["risk_score"])
-    updated["reasons"] = base_reasons + reasons
-    updated["verdict"] = _compute_verdict(updated["risk_score"])
+    combined_reasons = base_reasons + [r for r in reasons if r not in base_reasons]
+    
+    current_score = int(updated.get("risk_score", 0))
+    final_score = min(100, current_score + risk_delta)
+
+    updated["risk_score"] = final_score
+    updated["confidence_score"] = float(final_score)
+    updated["reasons"] = combined_reasons
+    updated["verdict"] = _compute_verdict(final_score)
+    updated["risk_breakdown"] = calculate_category_risk_breakdown(updated, final_score, combined_reasons)
     return updated
 
 
@@ -326,6 +337,20 @@ def _scan_single_url(request, raw_url, use_live_signals=True):
         confidence_score=features["confidence_score"],
         risk_score=features["risk_score"],
         reasons=features["reasons"],
+        # Rich intelligence fields
+        http_status_code=features.get("http_status_code"),
+        final_url=features.get("final_url", url_clean),
+        redirect_chain=features.get("redirect_chain", []),
+        page_title=features.get("page_title", ""),
+        has_password_input=features.get("has_password_input", False),
+        has_external_form=features.get("has_external_form", False),
+        ssl_issuer=features.get("ssl_issuer", ""),
+        ssl_valid_days=features.get("ssl_valid_days"),
+        domain_age_days=features.get("domain_age_days"),
+        ip_address=features.get("ip_address", ""),
+        geo_country=features.get("geo_country", ""),
+        threat_intel_details=features.get("threat_intel_details", {}),
+        risk_breakdown=features.get("risk_breakdown", {}),
     )
 
     payload = URLSerializer(url_obj).data
@@ -335,6 +360,19 @@ def _scan_single_url(request, raw_url, use_live_signals=True):
     payload["risk_score"] = scan_result.risk_score
     payload["verdict"] = scan_result.verdict
     payload["reasons"] = scan_result.reasons
+
+    sev = "info" if scan_result.verdict == "safe" else ("warning" if scan_result.verdict == "suspicious" else "critical")
+    log_audit_event(
+        request=request,
+        category="scan",
+        event_type="url_scanned",
+        severity=sev,
+        status="success",
+        target=raw_url,
+        details={"verdict": scan_result.verdict, "risk_score": scan_result.risk_score, "reasons": scan_result.reasons[:3]},
+        user=user,
+    )
+
     return payload
 
 
@@ -968,4 +1006,103 @@ class SIEMExportView(APIView):
             "format": "json",
             "incidents": incidents,
         }, status=200)
+
+
+class URLIntelligenceView(APIView):
+    """
+    GET /api/scan/intelligence/?url=... OR GET /api/scan/<int:pk>/intelligence/
+    Returns deep security domain & URL intelligence:
+    - Domain reputation & historical scan statistics
+    - Sub-category risk scores (domain_risk, network_risk, content_risk, threat_intel_risk)
+    - Network telemetry (IP address, TLS issuer, lifetime)
+    - Live content signals (page title, password inputs, form targets)
+    - VirusTotal & Google Safe Browsing details
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk=None):
+        raw_url = request.query_params.get("url") or request.query_params.get("domain")
+
+        scan_result = None
+        if pk:
+            try:
+                url_obj = URL.objects.select_related("scan_result").get(pk=pk)
+                scan_result = getattr(url_obj, "scan_result", None)
+                raw_url = url_obj.url
+            except URL.DoesNotExist:
+                return Response({"error": "Scan record not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not raw_url and not scan_result:
+            return Response({"error": "Parameter 'url' or 'pk' is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        raw_url, url_clean, error = _normalize_scan_input(raw_url)
+        if error and not scan_result:
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        parsed = urlparse(url_clean or raw_url)
+        bare_domain = re.sub(r"^www\.", "", (parsed.hostname or "").lower())
+
+        # Domain reputation statistics
+        related_urls = URL.objects.filter(normalized_url__icontains=bare_domain) if bare_domain else URL.objects.none()
+        total_scans = related_urls.count()
+        phishing_scans = related_urls.filter(status="phishing").count()
+        suspicious_scans = related_urls.filter(status="suspicious").count()
+        safe_scans = related_urls.filter(status="safe").count()
+
+        threat_rate = round((phishing_scans + suspicious_scans) / total_scans * 100, 1) if total_scans > 0 else 0.0
+
+        # Latest scan result if available
+        if not scan_result and related_urls.exists():
+            latest_url = related_urls.select_related("scan_result").order_by("-date_submitted").first()
+            if latest_url and hasattr(latest_url, "scan_result"):
+                scan_result = latest_url.scan_result
+
+        # Perform live scan enrichment if no existing scan result found
+        if scan_result:
+            scan_data = ScanResultSerializer(scan_result).data
+            features = scan_data
+        else:
+            features = extract_features(url_clean)
+            features = enrich_with_live_network_signals(url_clean, features)
+
+        blacklist_match = find_blacklisted_domain_match(bare_domain)
+
+        intelligence_data = {
+            "target_url": raw_url,
+            "domain": bare_domain,
+            "is_blacklisted": bool(blacklist_match),
+            "blacklist_reason": blacklist_match.reason if blacklist_match else "",
+            "domain_reputation": {
+                "total_scans_recorded": total_scans,
+                "phishing_scans": phishing_scans,
+                "suspicious_scans": suspicious_scans,
+                "safe_scans": safe_scans,
+                "threat_rate_percentage": threat_rate,
+            },
+            "risk_summary": {
+                "verdict": features.get("verdict", "safe"),
+                "confidence_score": features.get("confidence_score", 0.0),
+                "risk_score": features.get("risk_score", 0),
+                "risk_breakdown": features.get("risk_breakdown") or calculate_category_risk_breakdown(features, features.get("risk_score", 0), features.get("reasons", [])),
+                "reasons": features.get("reasons", []),
+            },
+            "network_telemetry": {
+                "ip_address": features.get("ip_address", ""),
+                "ssl_issuer": features.get("ssl_issuer", ""),
+                "ssl_valid_days": features.get("ssl_valid_days"),
+                "uses_https": features.get("uses_https", True),
+                "has_ip_host": features.get("has_ip_address", False),
+            },
+            "content_inspection": {
+                "http_status_code": features.get("http_status_code"),
+                "final_url": features.get("final_url", url_clean),
+                "page_title": features.get("page_title", ""),
+                "has_password_input": features.get("has_password_input", False),
+                "has_external_form": features.get("has_external_form", False),
+                "redirect_chain": features.get("redirect_chain", []),
+            },
+            "threat_intelligence": features.get("threat_intel_details", {}),
+        }
+
+        return Response(intelligence_data, status=status.HTTP_200_OK)
 

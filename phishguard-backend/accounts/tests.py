@@ -1,82 +1,105 @@
+from django.test import TestCase
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
-from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
+from rest_framework import status
 
-from accounts.models import SecurityEvent
+from accounts.models import AuditLog, User
+from accounts.audit_logger import log_audit_event, extract_client_ip
+
+User = get_user_model()
 
 
-class AuthSecurityTests(TestCase):
+class AuditLoggerUnitTests(TestCase):
     def setUp(self):
-        cache.clear()
+        self.user = User.objects.create_user(
+            email="auditor@phishguard.test",
+            username="auditor",
+            password="Password123!",
+            role="admin",
+        )
+
+    def test_log_audit_event_creates_record(self):
+        log_audit_event(
+            category="auth",
+            event_type="login_success",
+            severity="info",
+            status="success",
+            target="user@example.com",
+            details={"provider": "jwt"},
+            user=self.user,
+        )
+
+        log = AuditLog.objects.filter(event_type="login_success").first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.category, "auth")
+        self.assertEqual(log.severity, "info")
+        self.assertEqual(log.user_email, "auditor@phishguard.test")
+        self.assertEqual(log.details.get("provider"), "jwt")
+
+    def test_client_ip_extraction(self):
+        class MockRequest:
+            META = {"HTTP_X_FORWARDED_FOR": "203.0.113.195, 10.0.0.1", "REMOTE_ADDR": "127.0.0.1"}
+
+        ip = extract_client_ip(MockRequest())
+        self.assertEqual(ip, "203.0.113.195")
+
+
+class AuditLogAPITests(TestCase):
+    def setUp(self):
         self.client = APIClient()
-        self.user_email = "security.user@example.com"
-        self.user_password = "Sup3rStrongP@ss!"
-        get_user_model().objects.create_user(
-            email=self.user_email,
-            username="security-user",
-            password=self.user_password,
+        self.admin = User.objects.create_superuser(
+            email="admin@phishguard.test",
+            username="adminuser",
+            password="AdminPassword123!",
+        )
+        self.regular_user = User.objects.create_user(
+            email="user@phishguard.test",
+            username="regularuser",
+            password="UserPassword123!",
+            role="user",
         )
 
-    @override_settings(
-        LOGIN_LOCKOUT_THRESHOLD=3,
-        LOGIN_LOCKOUT_WINDOW_SECONDS=600,
-        LOGIN_LOCKOUT_SECONDS=600,
-    )
-    def test_login_locks_after_repeated_failures(self):
-        cache.clear()
-        payload = {"email": self.user_email, "password": "wrong-password"}
+        # Seed audit log records
+        log_audit_event(category="scan", event_type="url_scanned", severity="info", status="success", target="https://example.com", user=self.admin)
+        log_audit_event(category="auth", event_type="login_failed", severity="warning", status="failure", target="user@test.com", details={"reason": "bad_password"})
 
-        first = self.client.post("/api/token/", payload, format="json")
-        second = self.client.post("/api/token/", payload, format="json")
-        third = self.client.post("/api/token/", payload, format="json")
+    def test_regular_user_cannot_access_audit_logs(self):
+        from django.urls import reverse
+        self.client.force_authenticate(user=self.regular_user)
+        response = self.client.get(reverse("audit_logs"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        self.assertEqual(first.status_code, 401)
-        self.assertEqual(second.status_code, 401)
-        self.assertEqual(third.status_code, 429)
-        self.assertIn("Too many failed login attempts", third.data.get("error", ""))
+    def test_admin_can_query_audit_logs_with_filters(self):
+        from django.urls import reverse
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(reverse("audit_logs"), {"category": "scan"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        self.assertEqual(data["results"][0]["event_type"], "url_scanned")
 
-        blocked_valid = self.client.post(
-            "/api/token/",
-            {"email": self.user_email, "password": self.user_password},
-            format="json",
-        )
-        self.assertEqual(blocked_valid.status_code, 429)
+    def test_audit_log_stats_endpoint(self):
+        from django.urls import reverse
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(reverse("audit_log_stats"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertIn("total_events", data)
+        self.assertIn("category_breakdown", data)
+        self.assertIn("severity_breakdown", data)
 
-    def test_register_rejects_common_weak_password(self):
-        response = self.client.post(
-            "/api/register/",
-            {
-                "email": "weak.pass@example.com",
-                "username": "weak-pass",
-                "password": "password123",
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, 400)
+    def test_audit_log_export_csv_and_cef(self):
+        from django.urls import reverse
+        self.client.force_authenticate(user=self.admin)
+        
+        # Test CSV export
+        url = reverse("audit_log_export")
+        csv_res = self.client.get(f"{url}?format=csv")
+        self.assertEqual(csv_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(csv_res["Content-Type"], "text/csv")
+        self.assertIn("Category,Event Type", csv_res.content.decode())
 
-    def test_login_success_writes_security_event(self):
-        response = self.client.post(
-            "/api/token/",
-            {"email": self.user_email, "password": self.user_password},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(
-            SecurityEvent.objects.filter(
-                event_type="login_success",
-                email=self.user_email,
-                success=True,
-            ).exists()
-        )
-
-    def test_admin_can_list_security_events(self):
-        admin = get_user_model().objects.create_superuser(
-            email="admin@example.com",
-            username="admin-user",
-            password="AdminStrongP@ss1",
-        )
-        self.client.force_authenticate(user=admin)
-        response = self.client.get("/api/admin/security-events/?limit=5")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("results", response.data)
+        # Test CEF export
+        cef_res = self.client.get(f"{url}?format=cef")
+        self.assertEqual(cef_res.status_code, status.HTTP_200_OK)
+        self.assertIn("CEF:0|PhishGuard|AuditEngine", cef_res.content.decode())

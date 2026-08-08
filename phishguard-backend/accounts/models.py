@@ -94,6 +94,72 @@ class SecurityEvent(models.Model):
         return f"{self.event_type} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
 
 
+class AuditLog(models.Model):
+    """
+    Enterprise Audit Log table recording all security, scanning, user management,
+    and administrative events across PhishGuard.
+    """
+    CATEGORY_CHOICES = [
+        ("auth", "Authentication"),
+        ("scan", "Threat Scanning"),
+        ("blacklist", "Blacklist Management"),
+        ("report", "Reports & Flagging"),
+        ("account", "Account Management"),
+        ("system", "System Events"),
+    ]
+
+    SEVERITY_CHOICES = [
+        ("info", "Information"),
+        ("warning", "Warning"),
+        ("critical", "Critical Security Alert"),
+    ]
+
+    STATUS_CHOICES = [
+        ("success", "Success"),
+        ("failure", "Failure"),
+        ("blocked", "Blocked / Throttle"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    category = models.CharField(max_length=32, choices=CATEGORY_CHOICES, default="system", db_index=True)
+    event_type = models.CharField(max_length=64, db_index=True)
+    severity = models.CharField(max_length=16, choices=SEVERITY_CHOICES, default="info", db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="success", db_index=True)
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_logs",
+    )
+    user_email = models.EmailField(max_length=150, blank=True, default="")
+    user_role = models.CharField(max_length=20, blank=True, default="")
+
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_index=True)
+    user_agent = models.CharField(max_length=300, blank=True, default="")
+    request_path = models.CharField(max_length=255, blank=True, default="")
+    request_method = models.CharField(max_length=10, blank=True, default="")
+
+    target_resource = models.CharField(max_length=255, blank=True, default="")
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "audit_logs"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["category", "created_at"], name="idx_audit_cat_date"),
+            models.Index(fields=["event_type", "created_at"], name="idx_audit_evt_date"),
+            models.Index(fields=["severity", "created_at"], name="idx_audit_sev_date"),
+            models.Index(fields=["user", "created_at"], name="idx_audit_usr_date"),
+            models.Index(fields=["ip_address", "created_at"], name="idx_audit_ip_date"),
+        ]
+
+    def __str__(self):
+        return f"[{self.severity.upper()}] {self.category}/{self.event_type} by {self.user_email or 'anon'} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
+
+
 class APIKey(models.Model):
     """
     Enterprise API Key for automated SOC/SIEM integrations.

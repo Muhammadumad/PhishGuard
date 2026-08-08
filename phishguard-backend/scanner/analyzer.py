@@ -27,6 +27,7 @@ import re
 import ipaddress
 import json
 import math
+import unicodedata
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 
@@ -43,6 +44,98 @@ CHAR_SKELETON_MAP = str.maketrans({
     "@": "a",
     "$": "s",
 })
+
+
+def _detect_unicode_homoglyphs(domain: str) -> tuple[bool, str | None]:
+    """Detect non-ASCII characters or mixed scripts (e.g. Cyrillic/Greek in domain)."""
+    if "xn--" in domain.lower():
+        try:
+            decoded = domain.encode("utf-8").decode("idna")
+        except Exception:
+            decoded = domain
+    else:
+        decoded = domain
+
+    has_non_ascii = any(ord(c) > 127 for c in decoded)
+    if has_non_ascii:
+        scripts = set()
+        for char in decoded:
+            if char.isalpha():
+                scripts.add(unicodedata.name(char, "").split()[0])
+        if len(scripts) > 1:
+            return True, f"Mixed script characters detected in hostname ({', '.join(sorted(scripts))})"
+        return True, "Unicode non-ASCII characters present in hostname"
+    return False, None
+
+
+def calculate_category_risk_breakdown(features: dict, risk_score: int, reasons: list[str]) -> dict:
+    """
+    Categorize total risk score into 4 clear security categories:
+    - Domain Risk (0-30 pts)
+    - Network & SSL Risk (0-25 pts)
+    - Content Risk (0-25 pts)
+    - Threat Intel Risk (0-20 pts)
+    """
+    domain_pts = 0
+    network_pts = 0
+    content_pts = 0
+    intel_pts = 0
+
+    reason_str = " ".join(reasons).lower()
+
+    # Threat Intel & Blacklist
+    if "blacklist" in reason_str:
+        intel_pts += 20
+    if "virustotal" in reason_str:
+        intel_pts += 15
+    if "safe browsing" in reason_str:
+        intel_pts += 15
+
+    # Network & SSL
+    if "tls" in reason_str or "ssl" in reason_str or "certificate" in reason_str:
+        network_pts += 12
+    if "dns" in reason_str or "private" in reason_str or "loopback" in reason_str:
+        network_pts += 10
+    if "redirect" in reason_str or "hops" in reason_str:
+        network_pts += 8
+
+    # Content Risk
+    if "credential" in reason_str or "password" in reason_str:
+        content_pts += 12
+    if "external target" in reason_str or "form" in reason_str:
+        content_pts += 15
+    if "zero-font" in reason_str or "obfuscation" in reason_str:
+        content_pts += 10
+
+    # Domain Risk (Heuristics & Lookalikes)
+    if features.get("has_ip_address"):
+        domain_pts += 15
+    if features.get("has_punycode") or features.get("has_unicode_homoglyph"):
+        domain_pts += 12
+    if features.get("has_suspicious_tld"):
+        domain_pts += 10
+    if features.get("double_tld"):
+        domain_pts += 10
+    if features.get("is_shortened"):
+        domain_pts += 8
+    if features.get("has_high_entropy_domain"):
+        domain_pts += 8
+    if "impersonat" in reason_str or "mimics" in reason_str or "lookalike" in reason_str:
+        domain_pts += 15
+
+    # Cap categories
+    domain_risk = min(30, max(0, domain_pts))
+    network_risk = min(25, max(0, network_pts))
+    content_risk = min(25, max(0, content_pts))
+    threat_intel_risk = min(20, max(0, intel_pts))
+
+    return {
+        "domain_risk": domain_risk,
+        "network_risk": network_risk,
+        "content_risk": content_risk,
+        "threat_intel_risk": threat_intel_risk,
+        "total_risk": risk_score,
+    }
 
 
 def _shannon_entropy(text: str) -> float:
@@ -634,6 +727,12 @@ def extract_features(url: str) -> dict:
         points += 30
         reasons.append("Punycode detected — homograph/lookalike attack")
 
+    has_unicode_homoglyph, homoglyph_reason = _detect_unicode_homoglyphs(bare)
+    if has_unicode_homoglyph:
+        feats["has_unicode_homoglyph"] = True
+        points += 30
+        reasons.append(f"Homoglyph threat: {homoglyph_reason}")
+
     # ── Brand typo-squatting (+30) ────────────────────────────────────────────
     brand_hit = None
     for brand, pattern in BRAND_PATTERNS.items():
@@ -951,8 +1050,12 @@ def _result(features, score, reasons, verdict, source="heuristic"):
         "double_tld": False,
         "has_credentials_in_query": False,
         "has_deep_path": False,
+        "has_unicode_homoglyph": False,
+        "domain_entropy": 0.0,
     }
     f = {**defaults, **features}
+    breakdown = calculate_category_risk_breakdown(f, score, reasons)
+
     return {
         **f,
         "risk_score":       score,
@@ -960,4 +1063,5 @@ def _result(features, score, reasons, verdict, source="heuristic"):
         "verdict":          verdict,
         "reasons":          reasons,
         "scan_source":      source,   # blacklist / trusted / impersonation / heuristic
+        "risk_breakdown":   breakdown,
     }

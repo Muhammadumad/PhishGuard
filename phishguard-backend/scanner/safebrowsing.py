@@ -1,16 +1,16 @@
 # scanner/safebrowsing.py — Google Safe Browsing API v4 Client
 import hashlib
 import os
-import requests
 import logging
 from django.core.cache import cache
+from .api_client import ResilientAPIClient
 
 logger = logging.getLogger("scanner")
 
 GSB_API_KEY = os.getenv("GOOGLE_SAFE_BROWSING_API_KEY", "").strip()
 GSB_API_URL = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
 GSB_CACHE_TTL = int(os.getenv("GSB_CACHE_TTL", "3600"))
-GSB_REQUEST_TIMEOUT = float(os.getenv("GSB_REQUEST_TIMEOUT", "2.0"))
+GSB_REQUEST_TIMEOUT = (2.0, 3.5)
 
 
 def check_google_safe_browsing(url: str) -> dict:
@@ -46,12 +46,15 @@ def check_google_safe_browsing(url: str) -> dict:
     }
 
     try:
-        response = requests.post(
+        response = ResilientAPIClient.post(
             f"{GSB_API_URL}?key={GSB_API_KEY}",
-            json=payload,
+            json_data=payload,
             headers={"Content-Type": "application/json"},
             timeout=GSB_REQUEST_TIMEOUT,
         )
+
+        if response is None:
+            return {"enabled": True, "error": "Google Safe Browsing API connection failed or timed out"}
 
         if response.status_code != 200:
             logger.warning(f"Google Safe Browsing API returned HTTP {response.status_code}")

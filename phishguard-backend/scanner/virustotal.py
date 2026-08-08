@@ -1,16 +1,16 @@
 # scanner/virustotal.py — VirusTotal v3 API Integration
 import base64
 import os
-import requests
 import logging
 from django.core.cache import cache
+from .api_client import ResilientAPIClient
 
 logger = logging.getLogger("scanner")
 
 VT_API_KEY = os.getenv("VIRUSTOTAL_API_KEY", "").strip()
 VT_API_URL = "https://www.virustotal.com/api/v3/urls"
 VT_CACHE_TTL = int(os.getenv("VT_CACHE_TTL", "3600"))  # Cache VT results for 1 hour
-VT_REQUEST_TIMEOUT = float(os.getenv("VT_REQUEST_TIMEOUT", "2.5"))
+VT_REQUEST_TIMEOUT = (2.5, 3.5)
 
 
 def _url_to_vt_id(url: str) -> str:
@@ -40,11 +40,14 @@ def check_virustotal(url: str) -> dict:
             "Accept": "application/json",
         }
 
-        response = requests.get(
+        response = ResilientAPIClient.get(
             f"{VT_API_URL}/{vt_id}",
             headers=headers,
             timeout=VT_REQUEST_TIMEOUT,
         )
+
+        if response is None:
+            return {"enabled": True, "error": "VirusTotal API connection failed or timed out"}
 
         if response.status_code == 404:
             result = {

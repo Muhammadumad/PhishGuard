@@ -15,8 +15,12 @@ class ScanResultSerializer(serializers.ModelSerializer):
             "has_double_slash_redirect", "has_suspicious_tld", "is_shortened",
             "has_suspicious_keywords", "num_suspicious_keywords",
             "has_hex_encoding", "has_punycode",
-            # result
+            # result & rich intelligence
             "verdict", "confidence_score", "risk_score", "reasons", "scanned_at",
+            "http_status_code", "final_url", "redirect_chain", "page_title",
+            "has_password_input", "has_external_form", "ssl_issuer", "ssl_valid_days",
+            "domain_age_days", "ip_address", "geo_country", "threat_intel_details",
+            "risk_breakdown",
         ]
         read_only_fields = fields
 

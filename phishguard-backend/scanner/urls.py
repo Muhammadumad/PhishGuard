@@ -17,6 +17,10 @@ urlpatterns = [
     path("scan/bulk",               views.BulkScanView.as_view()),
     path("scan/bulk-csv/",          views.BulkCSVScanView.as_view(),   name="bulk_csv_scan"),
     path("scan/bulk-csv",           views.BulkCSVScanView.as_view()),
+    path("scan/intelligence/",       views.URLIntelligenceView.as_view(),name="url_intelligence"),
+    path("scan/intelligence",        views.URLIntelligenceView.as_view()),
+    path("scan/<int:pk>/intelligence/", views.URLIntelligenceView.as_view(), name="scan_pk_intelligence"),
+    path("scan/<int:pk>/intelligence",  views.URLIntelligenceView.as_view()),
     path("scan/<int:url_id>/",       views.ScanDetailView.as_view(),    name="scan_detail"),   # NEW v4
     path("scan/<int:url_id>",        views.ScanDetailView.as_view()),
     path("scan/<int:url_id>/delete/",views.DeleteScanView.as_view(),    name="delete_scan"),
