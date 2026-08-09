@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "accounts",     # custom User model
     "scanner",      # URL + ScanResult + Blacklist
     "reports",      # Report model
+    "monitoring",   # Real-time visit & search monitoring
 ]
 
 MIDDLEWARE = [
@@ -52,6 +53,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.ErrorMonitoringMiddleware",
+    "core.middleware.RequestTrackingMiddleware",   # ← User & visit tracking
 ]
 
 ROOT_URLCONF     = "core.urls"

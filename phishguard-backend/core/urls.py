@@ -185,9 +185,10 @@ urlpatterns = [
     path("api/redoc/",         SpectacularRedocView.as_view(url_name="schema"),       name="redoc"),
     
     # App URLs
-    path("api/accounts/",      include("accounts.urls")),
-    path("api/scanner/",       include("scanner.urls")),
-    path("api/reports/",       include("reports.urls")),
-    path("api/",               include("accounts.urls")),
-    path("api/",               include("scanner.urls")),
+    path("api/accounts/",    include("accounts.urls")),
+    path("api/scanner/",     include("scanner.urls")),
+    path("api/reports/",     include("reports.urls")),
+    path("api/monitoring/",  include("monitoring.urls")),  # ← Admin monitoring
+    path("api/",             include("accounts.urls")),
+    path("api/",             include("scanner.urls")),
 ]

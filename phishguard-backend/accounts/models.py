@@ -244,4 +244,70 @@ class ErrorLog(models.Model):
 
     def __str__(self):
         status_str = "RESOLVED" if self.is_resolved else "UNRESOLVED"
-        return f"[{self.severity.upper()} - {status_str}] {self.exception_class}: {self.message[:50]} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
+        return f"[{self.severity.upper()} - {status_str}] {self.exception_class}: {self.message[:50]} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
+
+
+class SiteVisit(models.Model):
+    """
+    TABLE: site_visits
+    Tracks every HTTP request to PhishGuard — both anonymous and authenticated.
+    Powers the real-time admin monitoring dashboard.
+    """
+    DEVICE_CHOICES = [
+        ("desktop", "Desktop"),
+        ("mobile",  "Mobile"),
+        ("tablet",  "Tablet"),
+        ("bot",     "Bot / Crawler"),
+        ("unknown", "Unknown"),
+    ]
+
+    id           = models.BigAutoField(primary_key=True)
+    # Who made the request
+    user         = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="site_visits",
+    )
+    user_email   = models.EmailField(max_length=150, blank=True, default="")
+    session_key  = models.CharField(max_length=64, blank=True, default="", db_index=True)
+
+    # Request details
+    ip_address   = models.GenericIPAddressField(null=True, blank=True, db_index=True)
+    path         = models.CharField(max_length=500, blank=True, default="", db_index=True)
+    method       = models.CharField(max_length=10, blank=True, default="GET")
+    status_code  = models.IntegerField(null=True, blank=True)
+    response_ms  = models.IntegerField(null=True, blank=True)  # response time in ms
+
+    # Browser / Device info (parsed from User-Agent)
+    user_agent   = models.TextField(blank=True, default="")
+    browser      = models.CharField(max_length=100, blank=True, default="")
+    os           = models.CharField(max_length=100, blank=True, default="")
+    device_type  = models.CharField(max_length=20, choices=DEVICE_CHOICES, default="unknown")
+
+    # Geo info (fetched async from ip-api.com)
+    country      = models.CharField(max_length=100, blank=True, default="")
+    country_code = models.CharField(max_length=5, blank=True, default="")
+    city         = models.CharField(max_length=100, blank=True, default="")
+    region       = models.CharField(max_length=100, blank=True, default="")
+    isp          = models.CharField(max_length=200, blank=True, default="")
+
+    # Referrer
+    referer      = models.TextField(blank=True, default="")
+
+    timestamp    = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "site_visits"
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["ip_address", "timestamp"],  name="idx_sv_ip_time"),
+            models.Index(fields=["user", "timestamp"],        name="idx_sv_user_time"),
+            models.Index(fields=["path", "timestamp"],        name="idx_sv_path_time"),
+            models.Index(fields=["device_type"],              name="idx_sv_device"),
+            models.Index(fields=["country_code"],             name="idx_sv_country"),
+        ]
+
+    def __str__(self):
+        who = self.user_email or self.ip_address or "unknown"
+        return f"{who} → {self.path} @ {self.timestamp:%Y-%m-%d %H:%M:%S}"

@@ -1,7 +1,7 @@
 # accounts/admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, SecurityEvent
+from .models import User, SecurityEvent, SiteVisit
 
 
 @admin.register(User)
@@ -26,3 +26,18 @@ class SecurityEventAdmin(admin.ModelAdmin):
     list_filter = ["event_type", "success", "created_at"]
     search_fields = ["email", "username", "ip_address"]
     ordering = ["-created_at"]
+
+
+@admin.register(SiteVisit)
+class SiteVisitAdmin(admin.ModelAdmin):
+    list_display  = ["timestamp", "user_email", "ip_address", "path", "method",
+                     "status_code", "browser", "device_type", "country"]
+    list_filter   = ["device_type", "method", "country_code", "timestamp"]
+    search_fields = ["user_email", "ip_address", "path", "browser", "country"]
+    ordering      = ["-timestamp"]
+    readonly_fields = [
+        "timestamp", "user", "user_email", "session_key",
+        "ip_address", "path", "method", "status_code", "response_ms",
+        "user_agent", "browser", "os", "device_type",
+        "country", "country_code", "city", "region", "isp", "referer",
+    ]
