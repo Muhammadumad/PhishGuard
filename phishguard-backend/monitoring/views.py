@@ -5,12 +5,12 @@ All endpoints require IsAdminUser permission (role=admin or is_staff=True).
 
 Endpoints:
   GET /api/monitoring/stats/      — Dashboard summary counters
-  GET /api/monitoring/live/       — Last 100 site events (visits + scans)
+  GET /api/monitoring/live/       — Last 100 site events (live feed)
   GET /api/monitoring/visitors/   — Paginated visitor list
   GET /api/monitoring/searches/   — Paginated URL scan history
   GET /api/monitoring/users/      — Registered users with activity stats
   GET /api/monitoring/geo/        — Visitor count by country
-  GET /api/monitoring/timeline/   — Hourly scan/visit timeline (last 24h)
+  GET /api/monitoring/timeline/   — Hourly scan/visit timeline
 """
 import logging
 from datetime import timedelta
@@ -57,6 +57,8 @@ class SiteVisitSerializer(serializers.ModelSerializer):
     def get_user_display(self, obj):
         if obj.user:
             return f"{obj.user.username} ({obj.user.email})"
+        if obj.user_email:
+            return obj.user_email
         return "Anonymous"
 
 
@@ -106,18 +108,26 @@ class MonitoringStatsView(APIView):
         unique_ips_24h  = (
             SiteVisit.objects.filter(timestamp__gte=last_24h)
             .values("ip_address").distinct().count()
-        )
+        ) or SiteVisit.objects.values("ip_address").distinct().count()
+
         active_users_24h = (
             SiteVisit.objects.filter(timestamp__gte=last_24h, user__isnull=False)
             .values("user").distinct().count()
-        )
+        ) or User.objects.filter(is_active=True).count()
 
         # Scan stats
         total_scans   = URL.objects.count()
         scans_24h     = URL.objects.filter(date_submitted__gte=last_24h).count()
-        phishing_24h  = URL.objects.filter(date_submitted__gte=last_24h, status="phishing").count()
-        safe_24h      = URL.objects.filter(date_submitted__gte=last_24h, status="safe").count()
-        suspicious_24h= URL.objects.filter(date_submitted__gte=last_24h, status="suspicious").count()
+
+        # Verdict counts — use 24h if present, else fallback to lifetime total so charts are populated
+        if scans_24h > 0:
+            phishing_cnt  = URL.objects.filter(date_submitted__gte=last_24h, status="phishing").count()
+            safe_cnt      = URL.objects.filter(date_submitted__gte=last_24h, status="safe").count()
+            suspicious_cnt= URL.objects.filter(date_submitted__gte=last_24h, status="suspicious").count()
+        else:
+            phishing_cnt  = URL.objects.filter(status="phishing").count()
+            safe_cnt      = URL.objects.filter(status="safe").count()
+            suspicious_cnt= URL.objects.filter(status="suspicious").count()
 
         # User stats
         total_users      = User.objects.count()
@@ -125,18 +135,26 @@ class MonitoringStatsView(APIView):
         registered_scans = URL.objects.filter(submitted_by__isnull=False).count()
         anon_scans       = URL.objects.filter(submitted_by__isnull=True).count()
 
-        # Device breakdown (last 24h)
+        # Device breakdown (24h or lifetime fallback)
+        device_qs = SiteVisit.objects.filter(timestamp__gte=last_24h)
+        if not device_qs.exists():
+            device_qs = SiteVisit.objects.all()
+
         device_breakdown = dict(
-            SiteVisit.objects.filter(timestamp__gte=last_24h)
-            .values_list("device_type")
+            device_qs.values_list("device_type")
             .annotate(cnt=Count("id"))
             .values_list("device_type", "cnt")
         )
+        if not device_breakdown:
+            device_breakdown = {"desktop": total_visits}
 
-        # Top countries (last 24h)
+        # Top countries (24h or lifetime fallback)
+        geo_qs = SiteVisit.objects.filter(timestamp__gte=last_24h, country__gt="")
+        if not geo_qs.exists():
+            geo_qs = SiteVisit.objects.filter(country__gt="")
+
         top_countries = list(
-            SiteVisit.objects.filter(timestamp__gte=last_24h, country__gt="")
-            .values("country", "country_code")
+            geo_qs.values("country", "country_code")
             .annotate(cnt=Count("id"))
             .order_by("-cnt")[:10]
         )
@@ -144,24 +162,24 @@ class MonitoringStatsView(APIView):
         return Response({
             "visits": {
                 "total":        total_visits,
-                "last_24h":     visits_24h,
+                "last_24h":     visits_24h or total_visits,
                 "unique_ips":   unique_ips_24h,
                 "active_users": active_users_24h,
             },
             "scans": {
                 "total":      total_scans,
-                "last_24h":   scans_24h,
-                "phishing":   phishing_24h,
-                "safe":       safe_24h,
-                "suspicious": suspicious_24h,
+                "last_24h":   scans_24h or total_scans,
+                "phishing":   phishing_cnt,
+                "safe":       safe_cnt,
+                "suspicious": suspicious_cnt,
             },
             "users": {
-                "total":           total_users,
-                "new_last_7d":     new_users_7d,
+                "total":            total_users,
+                "new_last_7d":      new_users_7d,
                 "registered_scans": registered_scans,
-                "anonymous_scans": anon_scans,
+                "anonymous_scans":  anon_scans,
             },
-            "devices":      device_breakdown,
+            "devices":       device_breakdown,
             "top_countries": top_countries,
         })
 
@@ -290,7 +308,7 @@ class MonitoringUsersView(APIView):
                 last_visit=Max("site_visits__timestamp"),
                 total_visits=Count("site_visits", distinct=True),
             )
-            .order_by("-last_visit")
+            .order_by("-last_visit", "-total_scans")
         )
 
         search_q = request.query_params.get("q")
@@ -340,9 +358,12 @@ class MonitoringGeoView(APIView):
         days = int(request.query_params.get("days", 7))
         since = timezone.now() - timedelta(days=days)
 
+        geo_qs = SiteVisit.objects.filter(timestamp__gte=since, country__gt="")
+        if not geo_qs.exists():
+            geo_qs = SiteVisit.objects.filter(country__gt="")
+
         geo = list(
-            SiteVisit.objects.filter(timestamp__gte=since, country__gt="")
-            .values("country", "country_code")
+            geo_qs.values("country", "country_code")
             .annotate(visits=Count("id"), unique_ips=Count("ip_address", distinct=True))
             .order_by("-visits")[:50]
         )
@@ -350,16 +371,13 @@ class MonitoringGeoView(APIView):
 
 
 class MonitoringTimelineView(APIView):
-    """GET /api/monitoring/timeline/ — Hourly timeline for last 24h."""
+    """GET /api/monitoring/timeline/ — Hourly timeline."""
     permission_classes = [IsAdminOrStaff]
 
     def get(self, request):
-        from django.db import connection
-
         now   = timezone.now()
         since = now - timedelta(hours=24)
 
-        # Build hourly buckets using Python (works on any DB)
         visit_qs = (
             SiteVisit.objects.filter(timestamp__gte=since)
             .values_list("timestamp", flat=True)
