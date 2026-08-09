@@ -23,11 +23,12 @@ import useThemeStore from "../store/ThemeStore";
 import usePerformanceStore from "../store/PerformanceStore";
 
 const NAV_ITEMS = [
-  { path: "/dashboard", icon: Grid,              label: "Dashboard" },
-  { path: "/bulk",      icon: Search,            label: "Bulk Scan"  },
-  { path: "/history",   icon: ClockHistory,      label: "History"    },
-  { path: "/analytics", icon: Activity,          label: "Analytics"  },
-  { path: "/qa",        icon: ExclamationCircle, label: "Quick QA"   },
+  { path: "/dashboard",  icon: Grid,              label: "Dashboard"  },
+  { path: "/bulk",       icon: Search,            label: "Bulk Scan"  },
+  { path: "/history",    icon: ClockHistory,      label: "History"    },
+  { path: "/analytics",  icon: Activity,          label: "Analytics"  },
+  { path: "/monitoring", icon: Eye,               label: "Monitoring" },
+  { path: "/qa",         icon: ExclamationCircle, label: "Quick QA"   },
 ];
 
 export default function TopNavbar() {
@@ -38,9 +39,7 @@ export default function TopNavbar() {
   const { theme, contrast, systemTheme, toggle, toggleContrast } = useThemeStore();
   const { mode, toggleMode } = usePerformanceStore();
 
-  const navItems = user?.role === "admin"
-    ? [...NAV_ITEMS, { path: "/monitoring", icon: Eye, label: "Monitoring" }]
-    : NAV_ITEMS;
+  const navItems = NAV_ITEMS;
 
   const [confirmLogout,  setConfirmLogout]  = useState(false);
   const [settingsOpen,   setSettingsOpen]   = useState(false);
