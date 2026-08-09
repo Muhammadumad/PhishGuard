@@ -412,3 +412,22 @@ class MonitoringTimelineView(APIView):
             })
 
         return Response({"timeline": timeline})
+
+
+import os
+from django.conf import settings
+from django.http import HttpResponse
+from rest_framework.permissions import AllowAny
+
+class DashboardView(APIView):
+    """GET /monitoring/ or /api/monitoring/dashboard/ — Serves the monitoring UI directly in the browser."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        html_path = settings.BASE_DIR / "monitoring_dashboard.html"
+        if os.path.exists(html_path):
+            with open(html_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return HttpResponse(content, content_type="text/html")
+        return Response({"error": "Dashboard HTML file not found"}, status=404)
+

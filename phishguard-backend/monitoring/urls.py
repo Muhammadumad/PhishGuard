@@ -17,4 +17,6 @@ urlpatterns = [
     path("geo",        views.MonitoringGeoView.as_view()),
     path("timeline/",  views.MonitoringTimelineView.as_view(), name="monitoring_timeline"),
     path("timeline",   views.MonitoringTimelineView.as_view()),
+    path("dashboard/", views.DashboardView.as_view(),          name="monitoring_dashboard"),
+    path("dashboard",  views.DashboardView.as_view()),
 ]

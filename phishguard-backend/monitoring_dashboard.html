@@ -1313,6 +1313,9 @@ function renderPagination(elId, data, loadFn) {
 
 /* ── Init ───────────────────────────────────────────────── */
 window.addEventListener('load', () => {
+  if (window.location.protocol.startsWith('http')) {
+    document.getElementById('loginApiUrl').value = window.location.origin;
+  }
   const savedToken = localStorage.getItem('pg_monitor_token');
   const savedApi   = localStorage.getItem('pg_monitor_api');
   if (savedToken && savedApi) {
