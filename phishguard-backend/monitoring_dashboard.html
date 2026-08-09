@@ -1313,18 +1313,21 @@ function renderPagination(elId, data, loadFn) {
 
 /* ── Init ───────────────────────────────────────────────── */
 window.addEventListener('load', () => {
-  if (window.location.protocol.startsWith('http')) {
-    document.getElementById('loginApiUrl').value = window.location.origin;
-  }
-  const savedToken = localStorage.getItem('pg_monitor_token');
-  const savedApi   = localStorage.getItem('pg_monitor_api');
-  if (savedToken && savedApi) {
+  const isHttp = window.location.protocol.startsWith('http');
+  const defaultApi = isHttp ? window.location.origin : 'https://phishguard-api-g2df.onrender.com';
+  
+  const savedToken = localStorage.getItem('pg_monitor_token') || localStorage.getItem('pg_access');
+  const savedApi   = localStorage.getItem('pg_monitor_api') || defaultApi;
+
+  if (savedToken) {
     TOKEN    = savedToken;
     API_BASE = savedApi;
     document.getElementById('loginApiUrl').value = savedApi;
     document.getElementById('loginOverlay').style.display = 'none';
     setConnected(true);
     startDashboard();
+  } else if (isHttp) {
+    document.getElementById('loginApiUrl').value = window.location.origin;
   }
 });
 

@@ -7,6 +7,7 @@ import {
   Bullseye,
   ClockHistory,
   ExclamationCircle,
+  Eye,
   Gear,
   Grid,
   LightningCharge,
@@ -36,6 +37,10 @@ export default function TopNavbar() {
   const { user, logout, isLoggedIn, isGuest } = useAuthStore();
   const { theme, contrast, systemTheme, toggle, toggleContrast } = useThemeStore();
   const { mode, toggleMode } = usePerformanceStore();
+
+  const navItems = user?.role === "admin"
+    ? [...NAV_ITEMS, { path: "/monitoring", icon: Eye, label: "Monitoring" }]
+    : NAV_ITEMS;
 
   const [confirmLogout,  setConfirmLogout]  = useState(false);
   const [settingsOpen,   setSettingsOpen]   = useState(false);
@@ -140,7 +145,7 @@ export default function TopNavbar() {
             className="pg-topbar-nav pg-desktop-nav"
             aria-label="Main navigation"
           >
-            {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+            {navItems.map(({ path, icon: Icon, label }) => {
               const isActive = pathname === path;
               return (
                 <Link
@@ -190,6 +195,19 @@ export default function TopNavbar() {
                       </div>
                     </div>
                     <div className="pg-popover-divider" />
+                    {user?.role === "admin" && (
+                      <>
+                        <Link
+                          to="/monitoring"
+                          role="menuitem"
+                          className="pg-popover-btn"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Eye size={14} aria-hidden="true" /> Admin Monitoring
+                        </Link>
+                        <div className="pg-popover-divider" />
+                      </>
+                    )}
                     <button
                       type="button"
                       role="menuitem"
@@ -349,7 +367,7 @@ export default function TopNavbar() {
       >
         {/* Page links */}
         <nav className="pg-mobile-nav-list" aria-label="Mobile page navigation">
-          {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+          {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = pathname === path;
             return (
               <Link
