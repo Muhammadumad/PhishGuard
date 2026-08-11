@@ -7,6 +7,7 @@ import {
   Bullseye,
   ClockHistory,
   ExclamationCircle,
+  Eye,
   Gear,
   Grid,
   LightningCharge,
@@ -22,11 +23,12 @@ import useThemeStore from "../store/ThemeStore";
 import usePerformanceStore from "../store/PerformanceStore";
 
 const NAV_ITEMS = [
-  { path: "/dashboard", icon: Grid,              label: "Dashboard" },
-  { path: "/bulk",      icon: Search,            label: "Bulk Scan"  },
-  { path: "/history",   icon: ClockHistory,      label: "History"    },
-  { path: "/analytics", icon: Activity,          label: "Analytics"  },
-  { path: "/qa",        icon: ExclamationCircle, label: "Quick QA"   },
+  { path: "/dashboard",  icon: Grid,              label: "Dashboard"  },
+  { path: "/bulk",       icon: Search,            label: "Bulk Scan"  },
+  { path: "/history",    icon: ClockHistory,      label: "History"    },
+  { path: "/analytics",  icon: Activity,          label: "Analytics"  },
+  { path: "/monitoring", icon: Eye,               label: "Monitoring" },
+  { path: "/qa",         icon: ExclamationCircle, label: "Quick QA"   },
 ];
 
 export default function TopNavbar() {
@@ -190,6 +192,19 @@ export default function TopNavbar() {
                       </div>
                     </div>
                     <div className="pg-popover-divider" />
+                    {user?.role === "admin" && (
+                      <>
+                        <Link
+                          to="/monitoring"
+                          role="menuitem"
+                          className="pg-popover-btn"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <Eye size={14} aria-hidden="true" /> Admin Monitoring
+                        </Link>
+                        <div className="pg-popover-divider" />
+                      </>
+                    )}
                     <button
                       type="button"
                       role="menuitem"

@@ -9,6 +9,7 @@ import BulkScanner from "./pages/BulkScanner";
 import History from "./pages/History";
 import Analytics from "./pages/Analytics";
 import QualityCheck from "./pages/QualityCheck";
+import Monitoring from "./pages/Monitoring";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
@@ -82,6 +83,14 @@ function Layout() {
           element={
             <AuthGuard>
               <QualityCheck />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/monitoring"
+          element={
+            <AuthGuard>
+              <Monitoring />
             </AuthGuard>
           }
         />
