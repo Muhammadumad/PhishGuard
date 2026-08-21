@@ -46,7 +46,9 @@ function clearAuth() {
 }
 
 // ── AuthGuard component ───────────────────────────────────────────────────────
-export default function AuthGuard({ children }) {
+import React from "react";
+
+export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem("pg_access");
   const isGuest = sessionStorage.getItem("pg_is_guest") === "true";
 
@@ -56,5 +58,5 @@ export default function AuthGuard({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  return children;
+  return <>{children}</>;
 }
