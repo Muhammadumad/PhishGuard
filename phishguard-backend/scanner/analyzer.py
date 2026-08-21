@@ -1,4 +1,4 @@
-# scanner/analyzer.py  —  PhishGuard Threat Analyzer v4
+# scanner/analyzer.py  —  PhishGuard Threat Analyzer v5
 # ─────────────────────────────────────────────────────────────────────────────
 # SCORING   0-100
 #   0 – 24   safe        (green)
@@ -21,7 +21,12 @@
 #   + NEW signal: numeric suffix in domain (bank123) → +3 pts
 #   + NEW signal: domain hyphen ratio (hyphens/length > 0.15) → +5 pts
 #   + IMPROVED: domain-specific hyphen check separate from full-URL count
-#   + IMPROVED: separate tracking of scan source (blacklist/impersonation/heuristic)
+# v5 UPGRADES over v4:
+#   + Expanded BRAND_PATTERNS, KW_CRITICAL, KW_MEDIUM, SUSPICIOUS_TLDS
+#   + Improved DGA detection with lower Shannon entropy threshold
+#   + NEW signal: shortener combined with open redirect (+25 pts)
+#   + Expanded executable extensions list
+#   + Precision tuning to reduce false positives
 
 import re
 import ipaddress
@@ -140,7 +145,7 @@ def calculate_category_risk_breakdown(features: dict, risk_score: int, reasons: 
 
 def _shannon_entropy(text: str) -> float:
     """Calculate Shannon entropy of a string (measures randomness/DGA)."""
-    if not text:
+    if not text or len(text) < 2:
         return 0.0
     prob = [float(text.count(c)) / len(text) for c in set(text)]
     return -sum(p * math.log2(p) for p in prob)
@@ -319,6 +324,9 @@ KNOWN_PHISHING = {
     "paypal-account-update.com", "amazon-prime-verify.com",
     "apple-support-alert.com", "google-security-verify.com",
     "microsoft-account-suspended.com", "netflix-billing-update.com",
+    # NEW v5 - more common
+    "linkedin-login-verify.com", "whatsapp-chat-invite.tk",
+    "telegram-secure-login.gq", "bankofamerica-alert.xyz",
 }
 
 # ── Trusted domains — instant score 2 ────────────────────────────────────────
@@ -366,6 +374,7 @@ TRUSTED_DOMAINS = {
     "dropbox.com", "notion.so", "notion.site", "shopify.com",
     "twitch.tv", "discord.com", "figma.com", "canva.com",
     "postman.com", "atlassian.net", "jira.com", "sentry.io",
+    "telegram.org", "linkedin.com", "webex.com",
 }
 
 # ── High-risk TLDs (+25 pts) ──────────────────────────────────────────────────
@@ -382,6 +391,8 @@ SUSPICIOUS_TLDS = {
     "su", "ws", "cc", "vip", "life",
     "world", "fun", "live", "shop",
     "icu", "monster", "cyou",
+    # NEW v5
+    "gdn", "date", "faith", "science", "party",
 }
 
 # ── URL shorteners (+30 pts) ──────────────────────────────────────────────────
@@ -415,6 +426,10 @@ BRAND_PATTERNS = {
     "twitter":    re.compile(r"tw[il1]tter|twiter|tw1tter"),
     "discord":    re.compile(r"d[il1]sc[o0]rd|disc0rd"),
     "steam":      re.compile(r"st[e3]am[-_]?pow|st[e3]am[-_]?community"),
+    # NEW v5
+    "linkedin":   re.compile(r"l[il1]nked[il1]n"),
+    "whatsapp":   re.compile(r"wh[a@]ts[a@]pp|wh[a@]tsap"),
+    "telegram":   re.compile(r"t[e3]l[e3]gr[a@]m"),
 }
 
 # ── Scam phrase patterns (+20 pts) ────────────────────────────────────────────
@@ -455,6 +470,8 @@ KW_CRITICAL = {
     "dob", "cardnumber", "creditcard", "debitcard",
     "chase", "wellsfargo", "binance", "coinbase",
     "tiktok", "discord", "steam", "metamask",
+    # NEW v5
+    "kyc", "verify-id", "unauth", "blocked",
 }
 
 # ── MEDIUM keywords — suspicious but indirect (+12 pts, max 1 hit) ───────────
@@ -473,6 +490,8 @@ KW_MEDIUM = {
     "mint", "swap", "token", "presale",
     "refund", "chargeback", "cashout",
     "promo", "activation", "subscription",
+    # NEW v5
+    "invoice", "receipt", "document", "pdf",
 }
 
 # ── LOW keywords — social engineering lures (+8 pts, max 1 hit) ──────────────
@@ -715,8 +734,13 @@ def extract_features(url: str) -> dict:
     # ── Shannon Entropy check on domain labels (+12) ────────────────────────
     high_entropy_labels = []
     for label in parts[:-1]:
-        if len(label) >= 8 and _shannon_entropy(label) > 4.15:
+        if len(label) >= 8 and _shannon_entropy(label) > 3.85: # Lowered threshold for v5
             high_entropy_labels.append(label)
+            
+    if high_entropy_labels:
+        points += 12
+        reasons.append("High entropy domain label (DGA/random string) detected")
+        
     # ── Typo subdomain prefix check (wwt, ww1, wvw, etc.) (+35 pts) ───────────
     if parts and (parts[0] in TYPO_PREFIXES or any(p in TYPO_PREFIXES for p in parts[:-1])):
         points += 35
@@ -838,6 +862,11 @@ def extract_features(url: str) -> dict:
     if feats["is_shortened"]:
         points += 30
         reasons.append("URL shortener hides real destination — treat with caution")
+        
+        # ── NEW v5: URL shortener + Open Redirect (+25) ───────────────────────────
+        if has_open_redirect:
+            points += 25
+            reasons.append("URL shortener combined with an open redirect — high risk evasion tactic")
 
     # ── No HTTPS (+10) ────────────────────────────────────────────────────────
     if not feats["uses_https"]:
@@ -889,7 +918,7 @@ def extract_features(url: str) -> dict:
         reasons.append(f"Unusual port ({parsed.port})")
 
     # ── Executable file in path (+25) ─────────────────────────────────────────
-    if re.search(r'\.(exe|zip|bat|cmd|msi|dmg|apk|sh|ps1|vbs|jar)($|\?)', path):
+    if re.search(r'\.(exe|zip|bat|cmd|msi|dmg|apk|sh|ps1|vbs|jar|scr|pif|vbe|wsf|iso|cab)($|\?)', path):
         points += 25
         reasons.append("Executable file extension in URL path — potential malware")
 

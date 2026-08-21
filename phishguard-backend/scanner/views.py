@@ -278,7 +278,7 @@ def _scan_single_url(request, raw_url, use_live_signals=True):
 
     if not features:
         # Fall back to in-process cache/compute
-        cache_key = f"scan_v5:{normalized_hash}"
+        cache_key = f"scan_v6:{normalized_hash}"
         cached = None
         try:
             cached = cache.get(cache_key)
