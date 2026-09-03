@@ -1,17 +1,41 @@
-// src/store/authStore.js
+// src/store/AuthStore.ts
 import { create } from "zustand";
 
-const isGuestInitial = typeof sessionStorage !== "undefined" && sessionStorage.getItem("pg_is_guest") === "true";
-const storedUser = JSON.parse(localStorage.getItem("pg_user") || "null");
+export interface User {
+  username: string;
+  email: string;
+  role: "admin" | "user" | "guest";
+  isGuest?: boolean;
+}
 
-const guestUser = {
+interface AuthState {
+  isGuest: boolean;
+  user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  isLoggedIn: boolean;
+  setAuth: (user: User, accessToken: string, refreshToken: string) => void;
+  setGuestMode: () => void;
+  logout: () => void;
+  updateToken: (accessToken: string) => void;
+}
+
+const isGuestInitial =
+  typeof sessionStorage !== "undefined" &&
+  sessionStorage.getItem("pg_is_guest") === "true";
+
+const storedUser: User | null = JSON.parse(
+  localStorage.getItem("pg_user") || "null"
+);
+
+const guestUser: User = {
   username: "Guest User",
   email: "guest@session.local",
   role: "guest",
   isGuest: true,
 };
 
-const useAuthStore = create((set) => ({
+const useAuthStore = create<AuthState>((set) => ({
   isGuest: isGuestInitial,
   user: isGuestInitial ? guestUser : storedUser,
   accessToken: localStorage.getItem("pg_access") || null,
@@ -43,7 +67,13 @@ const useAuthStore = create((set) => ({
     localStorage.removeItem("pg_user");
     sessionStorage.removeItem("pg_is_guest");
     sessionStorage.removeItem("pg_guest_history");
-    set({ user: null, accessToken: null, refreshToken: null, isLoggedIn: false, isGuest: false });
+    set({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isLoggedIn: false,
+      isGuest: false,
+    });
   },
 
   updateToken: (accessToken) => {

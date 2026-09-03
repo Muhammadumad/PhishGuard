@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, CheckCircle2, ShieldAlert, ShieldCheck, Search, Terminal, Globe, Zap, Cpu, Pause, Play, Clock, Network, AlertTriangle } from "lucide-react";
+import { ArrowRight, CheckCircle2, ShieldAlert, ShieldCheck, Search, Terminal, Globe, Zap, Cpu, Pause, Play, Clock, Network, AlertTriangle, RefreshCw } from "lucide-react";
 import useAuthStore from "../store/AuthStore";
 
 const SAMPLE_URLS = [

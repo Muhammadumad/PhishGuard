@@ -1,11 +1,20 @@
+// src/store/PerformanceStore.ts
 import { create } from "zustand";
 
-const saved =
+type PerfMode = "fast" | "rich";
+
+interface PerformanceState {
+  mode: PerfMode;
+  toggleMode: () => void;
+}
+
+const saved = (
   typeof window !== "undefined"
     ? localStorage.getItem("pg-performance") || "fast"
-    : "fast";
+    : "fast"
+) as PerfMode;
 
-function applyPerformance(mode) {
+function applyPerformance(mode: PerfMode): void {
   if (typeof window === "undefined") return;
   const body = document.body;
   if (!body) return;
@@ -14,7 +23,7 @@ function applyPerformance(mode) {
   body.classList.add(mode === "rich" ? "pg-perf-rich" : "pg-perf-fast");
 }
 
-function initPerformance() {
+function initPerformance(): void {
   if (typeof window === "undefined") return;
 
   if (document.body) {
@@ -31,11 +40,11 @@ function initPerformance() {
   );
 }
 
-const usePerformanceStore = create((set) => ({
+const usePerformanceStore = create<PerformanceState>((set) => ({
   mode: saved,
   toggleMode: () =>
     set((state) => {
-      const next = state.mode === "fast" ? "rich" : "fast";
+      const next: PerfMode = state.mode === "fast" ? "rich" : "fast";
       localStorage.setItem("pg-performance", next);
       applyPerformance(next);
       return { mode: next };
@@ -45,3 +54,4 @@ const usePerformanceStore = create((set) => ({
 initPerformance();
 
 export default usePerformanceStore;
+

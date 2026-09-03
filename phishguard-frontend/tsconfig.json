@@ -13,6 +13,10 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    "allowSyntheticDefaultImports": true,
+
+    /* Type roots — vite/client gives import.meta.env; node gives process.env */
+    "types": ["vite/client", "node"],
 
     /* Linting */
     "strict": false,

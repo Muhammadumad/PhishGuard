@@ -122,6 +122,7 @@ export default function Register() {
         {
           username: form.name.trim() ? form.name.trim().split(" ")[0] : form.email.split("@")[0],
           email: form.email,
+          role: "user",
         },
         access,
         refresh

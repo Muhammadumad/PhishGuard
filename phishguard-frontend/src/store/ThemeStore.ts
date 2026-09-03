@@ -1,34 +1,47 @@
-// src/store/themeStore.js
+// src/store/ThemeStore.ts
 import { create } from "zustand";
 
 const THEME_KEY = "pg-theme";
 const CONTRAST_KEY = "pg-contrast";
-const THEME_ORDER = ["dark", "light", "system"];
+const THEME_ORDER = ["dark", "light", "system"] as const;
+type Theme = typeof THEME_ORDER[number];
+type Contrast = "normal" | "high";
 
-const savedTheme =
+interface ThemeState {
+  theme: Theme;
+  contrast: Contrast;
+  systemTheme: "dark" | "light";
+  toggle: () => void;
+  setTheme: (nextTheme: Theme) => void;
+  toggleContrast: () => void;
+}
+
+const savedTheme = (
   typeof window !== "undefined"
     ? localStorage.getItem(THEME_KEY) || "system"
-    : "system";
+    : "system"
+) as Theme;
 
-const savedContrast =
+const savedContrast = (
   typeof window !== "undefined"
     ? localStorage.getItem(CONTRAST_KEY) || "normal"
-    : "normal";
+    : "normal"
+) as Contrast;
 
-let transitionTimer;
+let transitionTimer: ReturnType<typeof setTimeout>;
 
-function getSystemTheme() {
+function getSystemTheme(): "dark" | "light" {
   if (typeof window === "undefined") return "dark";
   return window.matchMedia("(prefers-color-scheme: light)").matches
     ? "light"
     : "dark";
 }
 
-function resolveTheme(theme) {
+function resolveTheme(theme: Theme): "dark" | "light" {
   return theme === "system" ? getSystemTheme() : theme;
 }
 
-function applyTheme(theme, contrast) {
+function applyTheme(theme: Theme, contrast: Contrast) {
   if (typeof window === "undefined") return;
 
   const root = document.documentElement;
@@ -43,7 +56,7 @@ function applyTheme(theme, contrast) {
   }, 380);
 }
 
-const useThemeStore = create((set, get) => ({
+const useThemeStore = create<ThemeState>((set, get) => ({
   theme: savedTheme,
   contrast: savedContrast,
   systemTheme: getSystemTheme(),
@@ -66,7 +79,7 @@ const useThemeStore = create((set, get) => ({
 
   toggleContrast: () =>
     set((state) => {
-      const nextContrast = state.contrast === "high" ? "normal" : "high";
+      const nextContrast: Contrast = state.contrast === "high" ? "normal" : "high";
       localStorage.setItem(CONTRAST_KEY, nextContrast);
       applyTheme(get().theme, nextContrast);
       return { contrast: nextContrast };

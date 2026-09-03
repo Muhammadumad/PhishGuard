@@ -1,5 +1,13 @@
-// src/api/scanAPI.js
+// src/api/scanAPI.ts
 import api from "./axiosInstance";
+
+interface HistoryOptions {
+  status?: string;
+  search?: string;
+  sort?: string;
+  page?: number;
+  page_size?: number;
+}
 
 function isGuestSession() {
   const hasToken = typeof localStorage !== "undefined" && Boolean(localStorage.getItem("pg_access"));
@@ -21,7 +29,8 @@ function saveGuestHistory(list) {
   } catch {}
 }
 
-function computeGuestHistory({ status, search, sort, page = 1, page_size = 10 } = {}) {
+function computeGuestHistory(options: HistoryOptions = {}) {
+  const { status, search, sort, page = 1, page_size = 10 } = options;
   let items = getGuestHistory();
   if (status && status !== "all") {
     items = items.filter((x) => (x.status || x.scan_result?.verdict) === status);
@@ -31,9 +40,9 @@ function computeGuestHistory({ status, search, sort, page = 1, page_size = 10 } 
     items = items.filter((x) => (x.url || "").toLowerCase().includes(q));
   }
   if (sort === "oldest") {
-    items.sort((a, b) => new Date(a.date_submitted) - new Date(b.date_submitted));
+    items.sort((a, b) => new Date(a.date_submitted).getTime() - new Date(b.date_submitted).getTime());
   } else {
-    items.sort((a, b) => new Date(b.date_submitted) - new Date(a.date_submitted));
+    items.sort((a, b) => new Date(b.date_submitted).getTime() - new Date(a.date_submitted).getTime());
   }
 
   const start = (page - 1) * page_size;
@@ -67,19 +76,19 @@ function computeGuestStats() {
 }
 
 // ── GET /api/history/ ─────────────────────────────────────────────────────────
-export async function fetchHistory(options = {}) {
+export async function fetchHistory(options: HistoryOptions = {}) {
   if (isGuestSession()) {
     return computeGuestHistory(options);
   }
 
   try {
-    const { status, search, sort, page = 1, page_size = 10 } = options;
+    const { status, search, sort, page = 1, page_size = 10 } = options as HistoryOptions;
     const params = new URLSearchParams();
     if (status && status !== "all") params.append("status", status);
     if (search) params.append("search", search);
     if (sort) params.append("sort", sort);
-    if (page) params.append("page", page);
-    if (page_size) params.append("page_size", page_size);
+    if (page) params.append("page", String(page));
+    if (page_size) params.append("page_size", String(page_size));
     const { data } = await api.get(`/history/?${params.toString()}`);
     return data;
   } catch (err) {
