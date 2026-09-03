@@ -913,9 +913,16 @@ def extract_features(url: str) -> dict:
         points += 5
 
     # ── Non-standard port (+8) ────────────────────────────────────────────────
-    if parsed.port and parsed.port not in (80, 443, 8080, 8443):
+    try:
+        url_port = parsed.port
+    except ValueError:
+        url_port = None
+        points += 15
+        reasons.append("Malformed or non-numeric port in URL")
+
+    if url_port and url_port not in (80, 443, 8080, 8443):
         points += 8
-        reasons.append(f"Unusual port ({parsed.port})")
+        reasons.append(f"Unusual port ({url_port})")
 
     # ── Executable file in path (+25) ─────────────────────────────────────────
     if re.search(r'\.(exe|zip|bat|cmd|msi|dmg|apk|sh|ps1|vbs|jar|scr|pif|vbe|wsf|iso|cab)($|\?)', path):

@@ -240,8 +240,28 @@ def _normalize_scan_input(raw_url):
     if len(raw_url) > 2000:
         return None, None, "URL too long — maximum 2000 characters"
 
-    normalized_url = raw_url if re.match(r"^https?://", raw_url, re.I) else "https://" + raw_url
-    url_clean = strip_tracking_params(normalized_url)
+    # Fix accidental single slash or misplaced colon in scheme e.g. https:/example or https://:google
+    cleaned = re.sub(r'^(https?):/(?!/)', r'\1://', raw_url, flags=re.I)
+    if not re.match(r'^[a-zA-Z][a-zA-Z0-9+.-]*://', cleaned):
+        cleaned = "https://" + cleaned
+    # Strip accidental colons/slashes directly after :// (e.g., https://:google -> https://google)
+    cleaned = re.sub(r'^(https?://)[:/]+', r'\1', cleaned, flags=re.I)
+
+    # Validate structure and port
+    try:
+        parsed = urlparse(cleaned)
+        _ = parsed.port
+    except ValueError:
+        return None, None, "Invalid URL format: Port must be a numeric integer (e.g. :443, :8080)"
+    except Exception as exc:
+        return None, None, f"Invalid URL format: {str(exc)}"
+
+    hostname = (parsed.hostname or "").strip()
+    netloc = (parsed.netloc or "").strip()
+    if not netloc or (not hostname and not netloc.split(":")[0]):
+        return None, None, "Invalid URL format: Missing valid domain name or hostname"
+
+    url_clean = strip_tracking_params(cleaned)
     return raw_url, url_clean, None
 
 

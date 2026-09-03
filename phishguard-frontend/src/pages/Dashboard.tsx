@@ -223,12 +223,17 @@ export default function Dashboard() {
 
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!urlInput.trim()) return;
+    let raw = urlInput.trim();
+    if (!raw) return;
+
+    // Auto-fix common scheme typos e.g. https:/ or https://:
+    raw = raw.replace(/^(https?):\/+(?::+)?/i, "$1://").replace(/^(https?:\/\/):+/i, "$1");
+
     setScanning(true);
     setCurrentResult(null);
     setApiError("");
     try {
-      const res = await api.post("/scan/", { url: urlInput.trim() });
+      const res = await api.post("/scan/", { url: raw });
       setCurrentResult({ ...res.data, time: "just now" });
       setUrlInput("");
       loadHistory();
