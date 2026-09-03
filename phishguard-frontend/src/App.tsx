@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import TopNavbar from "./components/TopNavbar";
 import AuthGuard from "./components/AuthGuard";
+import useAuthStore from "./store/AuthStore";
 
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
@@ -14,6 +15,15 @@ import Register from "./pages/Register";
 
 const PUBLIC_PATHS = ["/"];
 const AUTH_PATHS = ["/login", "/register"];
+
+/** Redirects non-admin users away from admin-only routes */
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  const { user } = useAuthStore();
+  if (user?.role !== "admin") {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return <>{children}</>;
+}
 
 function Layout() {
   const { pathname } = useLocation();
@@ -90,7 +100,9 @@ function Layout() {
             path="/monitoring"
             element={
               <AuthGuard>
-                <Monitoring />
+                <AdminGuard>
+                  <Monitoring />
+                </AdminGuard>
               </AuthGuard>
             }
           />
