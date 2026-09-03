@@ -23,12 +23,12 @@ import useThemeStore from "../store/ThemeStore";
 import usePerformanceStore from "../store/PerformanceStore";
 
 const NAV_ITEMS = [
-  { path: "/dashboard",  icon: Grid,              label: "Dashboard"  },
-  { path: "/bulk",       icon: Search,            label: "Bulk Scan"  },
-  { path: "/history",    icon: ClockHistory,      label: "History"    },
-  { path: "/analytics",  icon: Activity,          label: "Analytics"  },
-  { path: "/monitoring", icon: Eye,               label: "Monitoring" },
-  { path: "/qa",         icon: ExclamationCircle, label: "Quick QA"   },
+  { path: "/dashboard",  icon: Grid,              label: "Dashboard",  adminOnly: false },
+  { path: "/bulk",       icon: Search,            label: "Bulk Scan",  adminOnly: false },
+  { path: "/history",    icon: ClockHistory,      label: "History",    adminOnly: false },
+  { path: "/analytics",  icon: Activity,          label: "Analytics",  adminOnly: false },
+  { path: "/monitoring", icon: Eye,               label: "Monitoring", adminOnly: true  },
+  { path: "/qa",         icon: ExclamationCircle, label: "Quick QA",   adminOnly: false },
 ];
 
 export default function TopNavbar() {
@@ -38,6 +38,9 @@ export default function TopNavbar() {
   const { user, logout, isLoggedIn, isGuest } = useAuthStore();
   const { theme, contrast, systemTheme, toggle, toggleContrast } = useThemeStore();
   const { mode, toggleMode } = usePerformanceStore();
+
+  const isAdmin = user?.role === "admin";
+  const navItems = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
   const [confirmLogout,  setConfirmLogout]  = useState(false);
   const [settingsOpen,   setSettingsOpen]   = useState(false);
@@ -142,7 +145,7 @@ export default function TopNavbar() {
             className="pg-topbar-nav pg-desktop-nav"
             aria-label="Main navigation"
           >
-            {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+            {navItems.map(({ path, icon: Icon, label }) => {
               const isActive = pathname === path;
               return (
                 <Link
@@ -364,7 +367,7 @@ export default function TopNavbar() {
       >
         {/* Page links */}
         <nav className="pg-mobile-nav-list" aria-label="Mobile page navigation">
-          {NAV_ITEMS.map(({ path, icon: Icon, label }) => {
+          {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = pathname === path;
             return (
               <Link
